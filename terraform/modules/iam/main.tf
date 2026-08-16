@@ -90,16 +90,12 @@ resource "aws_iam_role_policy" "ecs_task" {
   })
 }
 
-data "tls_certificate" "github" {
-  count = var.github_org == "" ? 0 : 1
-  url   = "https://token.actions.githubusercontent.com"
-}
-
 resource "aws_iam_openid_connect_provider" "github" {
-  count           = var.github_org == "" ? 0 : 1
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.github[0].certificates[length(data.tls_certificate.github[0].certificates) - 1].sha1_fingerprint]
+  count          = var.github_org == "" ? 0 : 1
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  # AWS ignores GitHub IdP thumbprints; a placeholder is still required by the API.
+  thumbprint_list = ["ffffffffffffffffffffffffffffffffffffffff"]
   tags            = var.tags
 }
 
@@ -120,7 +116,12 @@ resource "aws_iam_role" "github_actions" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:*"
+          # Classic sub (repos created before 15 Jul 2026) and immutable sub
+          # (repo:org@ORG_ID/name@REPO_ID:...) used by this repo.
+          "token.actions.githubusercontent.com:sub" = [
+            "repo:${var.github_org}/${var.github_repo}:*",
+            "repo:${var.github_org}@*/${var.github_repo}@*:*",
+          ]
         }
       }
     }]
@@ -134,8 +135,20 @@ resource "aws_iam_role_policy" "github_actions" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["ecr:*", "ecs:*", "iam:PassRole", "logs:*", "elasticloadbalancing:*", "apigateway:*", "dynamodb:*", "bedrock:*", "ec2:*", "cloudwatch:*", "application-autoscaling:*"]
+      Effect = "Allow"
+      Action = [
+        "ecr:*",
+        "ecs:*",
+        "iam:*",
+        "logs:*",
+        "elasticloadbalancing:*",
+        "apigateway:*",
+        "dynamodb:*",
+        "bedrock:*",
+        "ec2:*",
+        "cloudwatch:*",
+        "application-autoscaling:*"
+      ]
       Resource = "*"
     }]
   })

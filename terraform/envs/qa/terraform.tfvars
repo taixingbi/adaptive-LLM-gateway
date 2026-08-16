@@ -1,7 +1,7 @@
 account_name  = "bedrock-platform-qa"
 account_id    = "000000000000"
 region        = "us-east-1"
-github_org    = ""
+github_org    = "taixingbi"
 github_repo   = "bedrock-platform"
 desired_count = 0
 apps          = []

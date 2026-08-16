@@ -10,7 +10,19 @@ One Bedrock control plane per environment. Spoke accounts call the gateway with 
 | `terraform/envs/qa` | `bedrock-platform-qa` | after dev |
 | `terraform/envs/prod` | `bedrock-platform-prod` | last |
 
-Fill the real 12-digit `account_id` in each `terraform.tfvars`. Those files are config, not secrets. GitHub Actions secrets stay empty: CI assumes `github-actions-bedrock-platform` via OIDC after you set `github_org`.
+Fill the real 12-digit `account_id` in each `terraform.tfvars`. GitHub Actions secrets stay empty.
+
+This repo was created after 15 Jul 2026, so GitHub OIDC `sub` is `repo:taixingbi@ORG_ID/bedrock-platform@REPO_ID:...`. The IAM trust policy matches both that format and the older `repo:org/repo:*` form.
+
+**Bootstrap once from your laptop** (CI cannot assume a role that does not exist yet):
+
+```bash
+cd terraform/envs/dev
+# set account_id to the bedrock-platform-dev 12-digit id
+terraform apply -target=module.platform.module.iam
+```
+
+Then the `dev` workflow can assume `github-actions-bedrock-platform`.
 
 ## Apply order (dev)
 
