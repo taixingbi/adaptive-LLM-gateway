@@ -1,0 +1,22 @@
+# MVP notes
+
+## Layout
+
+- `gateway/` — FastAPI process run on every ECS task (not one task per model).
+- `terraform/modules/` — networking, iam, bedrock (shared profiles), llm-gateway, monitoring, app-onboarding, platform.
+- `terraform/envs/{dev,qa,prod}` — `bedrock-platform-dev` / `qa` / `prod`.
+- `terraform/spoke-accounts/sample` — extra AWS account pattern: IAM role in spoke, DynamoDB item in platform.
+
+## Shared inference profiles
+
+Application inference profiles are capped (1,000 per account/Region) and bind to a model. This stack creates a handful of **shared** profiles (Claude Sonnet, Claude Haiku, Nova Lite, Llama). Cost and RBAC are `app_id` on CloudWatch metrics plus DynamoDB, not 1,000 Bedrock profiles.
+
+## GitHub
+
+No repository secrets. Set `github_org` in tfvars to create `github-actions-bedrock-platform`. The workflow computes `arn:aws:iam::<account_id>:role/github-actions-bedrock-platform` from tfvars.
+
+Local apply: `AWS_PROFILE` / SSO. Never commit access keys.
+
+## Quotas
+
+Gateway at 50 RPS is easy. Bedrock `InvokeModel` RPM/TPM is the constraint. Cross-Region inference on the shared profiles spreads load across `us-east-1` / `us-east-2` / `us-west-2` for US CRIS model IDs (`us.*`).

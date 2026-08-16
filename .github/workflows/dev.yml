@@ -1,0 +1,60 @@
+name: dev
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "gateway/**"
+      - "terraform/**"
+      - ".github/workflows/dev.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/envs/dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Read account_id
+        id: tfvars
+        working-directory: terraform/envs/dev
+        run: |
+          ACCOUNT_ID=$(grep -E '^account_id' terraform.tfvars | awk -F'"' '{print $2}')
+          REGION=$(grep -E '^region' terraform.tfvars | awk -F'"' '{print $2}')
+          echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
+          echo "region=$REGION" >> "$GITHUB_OUTPUT"
+          echo "role_arn=arn:aws:iam::${ACCOUNT_ID}:role/github-actions-bedrock-platform" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.tfvars.outputs.role_arn }}
+          aws-region: ${{ steps.tfvars.outputs.region }}
+
+      - name: Terraform apply
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+        working-directory: terraform/envs/dev
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push gateway
+        env:
+          REGION: ${{ steps.tfvars.outputs.region }}
+        run: |
+          ECR=$(terraform -chdir=terraform/envs/dev output -raw ecr_repository_url)
+          docker build -t "$ECR:latest" gateway
+          docker push "$ECR:latest"
+          CLUSTER=$(terraform -chdir=terraform/envs/dev output -raw ecr_repository_url >/dev/null)
+          aws ecs update-service --cluster bedrock-platform-dev-llm --service llm-gateway --force-new-deployment --region "$REGION" || true
