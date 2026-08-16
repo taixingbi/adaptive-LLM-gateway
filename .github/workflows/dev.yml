@@ -30,12 +30,17 @@ jobs:
         run: |
           ACCOUNT_ID=$(grep -E '^account_id' terraform.tfvars | awk -F'"' '{print $2}')
           REGION=$(grep -E '^region' terraform.tfvars | awk -F'"' '{print $2}')
+          if [ "$ACCOUNT_ID" = "000000000000" ]; then
+            echo "::error::Set account_id in terraform/envs/dev/terraform.tfvars to the real 12-digit AWS account, then apply module.platform.module.iam once from a laptop."
+            exit 1
+          fi
           echo "account_id=$ACCOUNT_ID" >> "$GITHUB_OUTPUT"
           echo "region=$REGION" >> "$GITHUB_OUTPUT"
           echo "role_arn=arn:aws:iam::${ACCOUNT_ID}:role/github-actions-bedrock-platform" >> "$GITHUB_OUTPUT"
+          echo "Assuming $ACCOUNT_ID role github-actions-bedrock-platform"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ steps.tfvars.outputs.role_arn }}
           aws-region: ${{ steps.tfvars.outputs.region }}

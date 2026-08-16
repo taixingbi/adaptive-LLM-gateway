@@ -1,5 +1,5 @@
 account_name = "bedrock-platform-dev"
-account_id   = "000000000000"
+account_id   = "646821141010"
 region       = "us-east-1"
 
 # GitHub org/user that owns this repo (OIDC trust). Empty skips the CI role.
