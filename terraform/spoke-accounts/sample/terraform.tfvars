@@ -9,7 +9,7 @@ apps = [
   {
     app_id         = "spoke-app-001"
     team           = "spoke-demo"
-    allowed_models = ["claude-sonnet"]
+    allowed_models = ["nova-lite"]
     rpm_limit      = 60
     token_limit    = 20000
   }

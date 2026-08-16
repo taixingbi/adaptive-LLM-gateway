@@ -12,10 +12,10 @@ def test_minute_window_is_utc_minute() -> None:
 
 
 def test_normalize_assumed_role() -> None:
-    assumed = "arn:aws:sts::123456789012:assumed-role/bedrock-platform-dev-app-app-001/session"
+    assumed = "arn:aws:sts::123456789012:assumed-role/bedrock-platform-dev-app-app-002/session"
     assert (
         normalize_principal_arn(assumed)
-        == "arn:aws:iam::123456789012:role/bedrock-platform-dev-app-app-001"
+        == "arn:aws:iam::123456789012:role/bedrock-platform-dev-app-app-002"
     )
 
 
@@ -28,18 +28,18 @@ def test_caller_arn_required() -> None:
 
 
 def test_model_allowlist() -> None:
-    app = {"app_id": "app-001", "allowed_models": ["claude-sonnet"]}
-    assert_model_allowed(app, "claude-sonnet")
+    app = {"app_id": "app-002", "allowed_models": ["nova-lite"]}
+    assert_model_allowed(app, "nova-lite")
     try:
-        assert_model_allowed(app, "nova-lite")
+        assert_model_allowed(app, "claude-haiku")
         raise AssertionError("expected 403")
     except HTTPException as exc:
         assert exc.status_code == 403
 
 
 def test_resolve_profile() -> None:
-    mapping = load_model_map('{"claude-sonnet": "arn:aws:bedrock:us-east-1:123:inference-profile/x"}')
-    assert resolve_profile(mapping, "claude-sonnet").endswith("/x")
+    mapping = load_model_map('{"nova-lite": "arn:aws:bedrock:us-east-1:123:inference-profile/x"}')
+    assert resolve_profile(mapping, "nova-lite").endswith("/x")
     try:
         resolve_profile(mapping, "missing")
         raise AssertionError("expected 400")

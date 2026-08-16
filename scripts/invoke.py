@@ -18,7 +18,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", required=True, help="https://{api-id}.execute-api.{region}.amazonaws.com/v1/converse")
     parser.add_argument("--region", default="us-east-1")
-    parser.add_argument("--model", default="claude-sonnet")
+    parser.add_argument("--model", default="nova-lite")
     parser.add_argument("--prompt", default="Reply with the word pong.")
     parser.add_argument("--profile")
     args = parser.parse_args()

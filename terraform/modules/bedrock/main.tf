@@ -21,10 +21,9 @@ variable "models" {
     source_model_id = string
   }))
   default = {
-    claude-sonnet = { source_model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0" }
-    claude-haiku  = { source_model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0" }
-    nova-lite     = { source_model_id = "us.amazon.nova-lite-v1:0" }
-    llama         = { source_model_id = "us.meta.llama3-3-70b-instruct-v1:0" }
+    claude-haiku = { source_model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0" }
+    nova-lite    = { source_model_id = "us.amazon.nova-lite-v1:0" }
+    llama        = { source_model_id = "us.meta.llama3-3-70b-instruct-v1:0" }
   }
 }
 

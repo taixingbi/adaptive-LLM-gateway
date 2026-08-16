@@ -6,17 +6,10 @@ region       = "us-east-1"
 github_org  = "taixingbi"
 github_repo = "bedrock-platform"
 
-# Stay at 0 until the gateway image is pushed to ECR, then set to 2.
-desired_count = 0
+# Image is in ECR; run 2 Fargate tasks behind the ALB.
+desired_count = 2
 
 apps = [
-  {
-    app_id         = "app-001"
-    team           = "demo"
-    allowed_models = ["claude-sonnet"]
-    rpm_limit      = 100
-    token_limit    = 50000
-  },
   {
     app_id         = "app-002"
     team           = "demo"
