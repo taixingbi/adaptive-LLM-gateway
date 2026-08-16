@@ -16,9 +16,6 @@ permissions:
 jobs:
   deploy-dev:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform/envs/dev
     steps:
       - uses: actions/checkout@v5
 
@@ -47,10 +44,10 @@ jobs:
           audience: sts.amazonaws.com
 
       - name: Terraform apply
+        working-directory: terraform/envs/dev
         run: |
           terraform init -input=false
           terraform apply -input=false -auto-approve
-        working-directory: terraform/envs/dev
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
