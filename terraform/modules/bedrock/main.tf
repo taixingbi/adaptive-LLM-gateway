@@ -10,13 +10,19 @@ variable "region" {
   type = string
 }
 
+variable "create_application_profiles" {
+  type        = bool
+  default     = false
+  description = "Create Bedrock application inference profiles. Off by default: many accounts cannot call CreateInferenceProfile. System CRIS model IDs are shared across apps either way."
+}
+
 variable "models" {
   type = map(object({
     source_model_id = string
   }))
   default = {
-    claude-sonnet = { source_model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0" }
-    claude-haiku  = { source_model_id = "us.anthropic.claude-3-5-haiku-20241022-v1:0" }
+    claude-sonnet = { source_model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0" }
+    claude-haiku  = { source_model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0" }
     nova-lite     = { source_model_id = "us.amazon.nova-lite-v1:0" }
     llama         = { source_model_id = "us.meta.llama3-3-70b-instruct-v1:0" }
   }
@@ -28,7 +34,7 @@ variable "tags" {
 }
 
 resource "aws_bedrock_inference_profile" "shared" {
-  for_each    = var.models
+  for_each    = var.create_application_profiles ? var.models : {}
   name        = replace("${var.name_prefix}-${each.key}", "_", "-")
   description = "Shared ${each.key} CRIS profile"
 
@@ -40,9 +46,9 @@ resource "aws_bedrock_inference_profile" "shared" {
 }
 
 output "profile_arns" {
-  value = { for k, v in aws_bedrock_inference_profile.shared : k => v.arn }
+  value = var.create_application_profiles ? { for k, v in aws_bedrock_inference_profile.shared : k => v.arn } : { for k, v in var.models : k => v.source_model_id }
 }
 
 output "model_map_json" {
-  value = jsonencode({ for k, v in aws_bedrock_inference_profile.shared : k => v.arn })
+  value = jsonencode(var.create_application_profiles ? { for k, v in aws_bedrock_inference_profile.shared : k => v.arn } : { for k, v in var.models : k => v.source_model_id })
 }
