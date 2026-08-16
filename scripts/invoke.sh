@@ -2,13 +2,11 @@
 # SigV4 invoke of POST /v1/converse against the central LLM gateway.
 #
 # Usage:
-#   ./scripts/invoke.sh                      # app-002 / nova-lite
-#   ./scripts/invoke.sh app-002 nova-lite
-#   ./scripts/invoke.sh app-003 claude-haiku "Say hello in one word."
+#   ./scripts/invoke.sh
+#   ./scripts/invoke.sh app-002 nova-lite "Say hello in one word."
 #
 # Seed apps (dev):
 #   app-002 → nova-lite
-#   app-003 → claude-haiku
 #
 # Requires: aws, jq, curl (with --aws-sigv4), terraform outputs for envs/dev.
 

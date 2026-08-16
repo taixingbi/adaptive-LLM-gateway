@@ -31,7 +31,7 @@ def test_model_allowlist() -> None:
     app = {"app_id": "app-002", "allowed_models": ["nova-lite"]}
     assert_model_allowed(app, "nova-lite")
     try:
-        assert_model_allowed(app, "claude-haiku")
+        assert_model_allowed(app, "llama")
         raise AssertionError("expected 403")
     except HTTPException as exc:
         assert exc.status_code == 403

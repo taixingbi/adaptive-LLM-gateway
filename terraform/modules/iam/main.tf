@@ -64,6 +64,15 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = "*"
       },
       {
+        Sid      = "MarketplaceModelAccess"
+        Effect   = "Allow"
+        Action   = [
+          "aws-marketplace:ViewSubscriptions",
+          "aws-marketplace:Subscribe"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "DynamoDB"
         Effect = "Allow"
         Action = [

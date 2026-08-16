@@ -9,7 +9,9 @@
 
 ## Shared inference profiles
 
-Application inference profiles are capped (1,000 per account/Region) and bind to a model. MVP does **not** call `CreateInferenceProfile` (this account returns 403). The gateway routes aliases to **system** US CRIS IDs (Claude Haiku, Nova Lite, Llama 3.3). Cost and RBAC stay on `app_id` in CloudWatch and DynamoDB. Set `create_application_profiles = true` later if the account is allowed to copy those system profiles.
+Application inference profiles are capped (1,000 per account/Region) and bind to a model. MVP does **not** call `CreateInferenceProfile` (this account returns 403). The gateway routes aliases to **system** US CRIS IDs (Nova Lite, Llama 3.3). Cost and RBAC stay on `app_id` in CloudWatch and DynamoDB. Set `create_application_profiles = true` later if the account is allowed to copy those system profiles.
+
+Claude models on this account need AWS Marketplace agreements that are not available here; demos use Nova Lite.
 
 ## GitHub
 

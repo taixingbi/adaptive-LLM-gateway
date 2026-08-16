@@ -16,12 +16,5 @@ apps = [
     allowed_models = ["nova-lite"]
     rpm_limit      = 300
     token_limit    = 100000
-  },
-  {
-    app_id         = "app-003"
-    team           = "demo"
-    allowed_models = ["claude-haiku"]
-    rpm_limit      = 50
-    token_limit    = 25000
   }
 ]

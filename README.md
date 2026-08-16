@@ -28,7 +28,7 @@ Then the `dev` workflow can assume `github-actions-bedrock-platform`.
 
 ## Apply order (dev)
 
-1. Enable Bedrock model access in `bedrock-platform-dev` for the CRIS models in [`terraform/modules/bedrock/main.tf`](terraform/modules/bedrock/main.tf) (Claude Haiku, Nova Lite, Llama).
+1. Enable Bedrock model access in `bedrock-platform-dev` for the CRIS models in [`terraform/modules/bedrock/main.tf`](terraform/modules/bedrock/main.tf) (Nova Lite, Llama).
 2. `cd terraform/envs/dev && terraform init && terraform apply` with `desired_count = 0`.
 3. Push the image:
 
@@ -44,9 +44,8 @@ docker push "$ECR:latest"
 
 ```bash
 chmod +x scripts/invoke.sh
-./scripts/invoke.sh                        # app-002 / nova-lite
-./scripts/invoke.sh app-002 nova-lite
-./scripts/invoke.sh app-003 claude-haiku "Say hello in one word."
+./scripts/invoke.sh
+./scripts/invoke.sh app-002 nova-lite "Say hello in one word."
 ```
 
 Or Python: `python3 scripts/invoke.py --url "$(terraform -chdir=terraform/envs/dev output -raw converse_url)" --region us-east-1`
