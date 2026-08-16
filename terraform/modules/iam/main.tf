@@ -147,7 +147,8 @@ resource "aws_iam_role_policy" "github_actions" {
         "bedrock:*",
         "ec2:*",
         "cloudwatch:*",
-        "application-autoscaling:*"
+        "application-autoscaling:*",
+        "s3:*"
       ]
       Resource = "*"
     }]

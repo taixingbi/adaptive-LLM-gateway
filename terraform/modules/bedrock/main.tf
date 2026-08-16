@@ -30,7 +30,7 @@ variable "tags" {
 resource "aws_bedrock_inference_profile" "shared" {
   for_each    = var.models
   name        = replace("${var.name_prefix}-${each.key}", "_", "-")
-  description = "Shared ${each.key} cross-Region profile (not per-app)"
+  description = "Shared ${each.key} CRIS profile"
 
   model_source {
     copy_from = "arn:aws:bedrock:${var.region}:${var.account_id}:inference-profile/${each.value.source_model_id}"

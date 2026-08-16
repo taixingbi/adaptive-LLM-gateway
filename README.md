@@ -14,6 +14,8 @@ One Bedrock control plane per environment. Spoke accounts call the gateway with 
 
 This repo was created after 15 Jul 2026, so GitHub OIDC `sub` is `repo:taixingbi@ORG_ID/bedrock-platform@REPO_ID:...`. The IAM trust policy matches both that format and the older `repo:org/repo:*` form.
 
+Terraform state is in S3 bucket `bedrock-platform-tfstate-646821141010` (keys `envs/{dev,qa,prod}/terraform.tfstate`), not in git. CI and laptops must share that backend so IAM/OIDC created locally is not recreated.
+
 **Bootstrap once from your laptop** (CI cannot assume a role that does not exist yet):
 
 ```bash
