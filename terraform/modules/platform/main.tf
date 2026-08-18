@@ -45,9 +45,30 @@ variable "models" {
     source_model_id = string
   }))
   default = {
-    nova-lite = { source_model_id = "us.amazon.nova-lite-v1:0" }
-    llama     = { source_model_id = "us.meta.llama3-3-70b-instruct-v1:0" }
+    nova-micro = { source_model_id = "us.amazon.nova-micro-v1:0" }
+    nova-lite  = { source_model_id = "us.amazon.nova-lite-v1:0" }
   }
+}
+
+variable "admission_policy" {
+  type    = string
+  default = "none"
+}
+
+variable "platform_tpm_budget" {
+  type        = number
+  default     = 100000
+  description = "Synthetic platform capacity budget (tokens/min). Not the AWS Bedrock quota."
+}
+
+variable "experiment_model_id" {
+  type    = string
+  default = "us.amazon.nova-micro-v1:0"
+}
+
+variable "run_id" {
+  type    = string
+  default = "dev"
 }
 
 variable "tags" {
@@ -98,6 +119,10 @@ module "llm_gateway" {
   desired_count          = var.desired_count
   cpu                    = var.cpu
   memory                 = var.memory
+  admission_policy       = var.admission_policy
+  platform_tpm_budget    = var.platform_tpm_budget
+  experiment_model_id    = var.experiment_model_id
+  run_id                 = var.run_id
   tags                   = local.tags
 }
 
@@ -137,4 +162,20 @@ output "model_map" {
 
 output "converse_url" {
   value = "${module.llm_gateway.api_endpoint}/v1/converse"
+}
+
+output "infer_url" {
+  value = "${module.llm_gateway.api_endpoint}/v1/infer"
+}
+
+output "results_bucket" {
+  value = module.llm_gateway.results_bucket
+}
+
+output "tenants_table_name" {
+  value = module.llm_gateway.tenants_table_name
+}
+
+output "alb_dns_name" {
+  value = module.llm_gateway.alb_dns_name
 }

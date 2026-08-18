@@ -43,6 +43,26 @@ variable "memory" {
   default = 1024
 }
 
+variable "admission_policy" {
+  type    = string
+  default = "none"
+}
+
+variable "platform_tpm_budget" {
+  type    = number
+  default = 100000
+}
+
+variable "experiment_model_id" {
+  type    = string
+  default = "us.amazon.nova-micro-v1:0"
+}
+
+variable "run_id" {
+  type    = string
+  default = "dev"
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
@@ -114,6 +134,78 @@ resource "aws_dynamodb_table" "rate_limits" {
   ttl {
     attribute_name = "expires_at"
     enabled        = true
+  }
+}
+
+resource "aws_dynamodb_table" "tenants" {
+  name         = "${var.name_prefix}-tenants"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "tenant_id"
+  tags         = var.tags
+
+  attribute {
+    name = "tenant_id"
+    type = "S"
+  }
+}
+
+resource "aws_s3_bucket" "results" {
+  bucket        = "${var.name_prefix}-exp-results"
+  force_destroy = true
+  tags          = var.tags
+}
+
+resource "aws_s3_bucket_public_access_block" "results" {
+  bucket                  = aws_s3_bucket.results.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_security_group" "redis" {
+  name        = "${var.name_prefix}-redis"
+  description = "ElastiCache Serverless for quota counters"
+  vpc_id      = var.vpc_id
+  tags        = merge(var.tags, { Name = "${var.name_prefix}-redis" })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "redis_from_ecs" {
+  security_group_id            = aws_security_group.redis.id
+  referenced_security_group_id = aws_security_group.ecs.id
+  ip_protocol                  = "tcp"
+  from_port                    = 6379
+  to_port                      = 6379
+}
+
+resource "aws_vpc_security_group_egress_rule" "redis_all" {
+  security_group_id = aws_security_group.redis.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
+
+resource "aws_elasticache_serverless_cache" "quota" {
+  engine               = "redis"
+  name                 = replace(substr("${var.name_prefix}-quota", 0, 40), "_", "-")
+  major_engine_version = "7"
+  description          = "Shared TPM/RPM/concurrency counters for admission control"
+  security_group_ids   = [aws_security_group.redis.id]
+  subnet_ids           = var.private_subnet_ids
+  tags                 = var.tags
+
+  cache_usage_limits {
+    data_storage {
+      maximum = 1
+      unit    = "GB"
+    }
+    ecpu_per_second {
+      maximum = 1000
+    }
+  }
+
+  timeouts {
+    create = "45m"
+    delete = "45m"
   }
 }
 
@@ -243,9 +335,16 @@ resource "aws_ecs_task_definition" "this" {
       { name = "AWS_REGION", value = data.aws_region.current.name },
       { name = "APPS_TABLE", value = aws_dynamodb_table.apps.name },
       { name = "RATE_LIMITS_TABLE", value = aws_dynamodb_table.rate_limits.name },
+      { name = "TENANTS_TABLE", value = aws_dynamodb_table.tenants.name },
       { name = "CALLER_ARN_HEADER", value = "x-caller-arn" },
       { name = "MODEL_MAP_JSON", value = var.model_map_json },
-      { name = "METRICS_NAMESPACE", value = "BedrockPlatform" }
+      { name = "METRICS_NAMESPACE", value = "BedrockPlatform" },
+      { name = "ADMISSION_POLICY", value = var.admission_policy },
+      { name = "PLATFORM_TPM_BUDGET", value = tostring(var.platform_tpm_budget) },
+      { name = "EXPERIMENT_MODEL_ID", value = var.experiment_model_id },
+      { name = "REDIS_URL", value = "rediss://${aws_elasticache_serverless_cache.quota.endpoint[0].address}:${aws_elasticache_serverless_cache.quota.endpoint[0].port}" },
+      { name = "RESULTS_BUCKET", value = aws_s3_bucket.results.bucket },
+      { name = "RUN_ID", value = var.run_id }
     ]
     logConfiguration = {
       logDriver = "awslogs"
@@ -322,6 +421,13 @@ resource "aws_apigatewayv2_route" "converse" {
   target             = "integrations/${aws_apigatewayv2_integration.this.id}"
 }
 
+resource "aws_apigatewayv2_route" "infer" {
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "POST /v1/infer"
+  authorization_type = "AWS_IAM"
+  target             = "integrations/${aws_apigatewayv2_integration.this.id}"
+}
+
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
@@ -392,4 +498,16 @@ output "alb_arn_suffix" {
 
 output "log_group_name" {
   value = aws_cloudwatch_log_group.gateway.name
+}
+
+output "results_bucket" {
+  value = aws_s3_bucket.results.bucket
+}
+
+output "tenants_table_name" {
+  value = aws_dynamodb_table.tenants.name
+}
+
+output "alb_dns_name" {
+  value = aws_lb.this.dns_name
 }

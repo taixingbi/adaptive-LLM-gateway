@@ -1,0 +1,14 @@
+# Known token demand used by Locust. Update after CountTokens.
+prompts:
+  short:
+    path: short.txt
+    input_tokens: 284
+    max_tokens: 64
+  medium:
+    path: medium.txt
+    input_tokens: 1942
+    max_tokens: 256
+  long:
+    path: long.txt
+    input_tokens: 8217
+    max_tokens: 1024

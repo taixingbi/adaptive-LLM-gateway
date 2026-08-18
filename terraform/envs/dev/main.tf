@@ -41,6 +41,18 @@ variable "desired_count" {
   type    = number
   default = 0
 }
+variable "admission_policy" {
+  type    = string
+  default = "none"
+}
+variable "platform_tpm_budget" {
+  type    = number
+  default = 100000
+}
+variable "run_id" {
+  type    = string
+  default = "dev"
+}
 variable "apps" {
   type = list(object({
     app_id         = string
@@ -53,15 +65,18 @@ variable "apps" {
 }
 
 module "platform" {
-  source        = "../../modules/platform"
-  account_name  = var.account_name
-  account_id    = var.account_id
-  region        = var.region
-  github_org    = var.github_org
-  github_repo   = var.github_repo
-  desired_count = var.desired_count
-  cpu           = 512
-  memory        = 1024
+  source              = "../../modules/platform"
+  account_name        = var.account_name
+  account_id          = var.account_id
+  region              = var.region
+  github_org          = var.github_org
+  github_repo         = var.github_repo
+  desired_count       = var.desired_count
+  admission_policy    = var.admission_policy
+  platform_tpm_budget = var.platform_tpm_budget
+  run_id              = var.run_id
+  cpu                 = 512
+  memory              = 1024
 }
 
 module "apps" {
@@ -89,3 +104,7 @@ output "converse_url" { value = module.platform.converse_url }
 output "github_actions_role_arn" { value = module.platform.github_actions_role_arn }
 output "model_map" { value = module.platform.model_map }
 output "sample_role_arns" { value = { for k, v in module.apps : k => v.role_arn } }
+output "infer_url" { value = module.platform.infer_url }
+output "results_bucket" { value = module.platform.results_bucket }
+output "tenants_table_name" { value = module.platform.tenants_table_name }
+output "alb_dns_name" { value = module.platform.alb_dns_name }

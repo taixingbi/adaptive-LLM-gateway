@@ -1,0 +1,19 @@
+# Experiment C — token-size burst at constant RPM.
+# Request rate stays 500 RPM. Input tokens jump 500 → 5000.
+# RPM limiter sees a normal request rate; TPM/SLO controllers see pressure.
+
+name: token_burst
+scenario: S3
+backend: us.amazon.nova-micro-v1:0
+rpm: 500
+policies: [none, rpm, tpm, priority, slo-aware]
+phases:
+  - name: normal
+    prompt_class: short
+    input_tokens: 500
+    max_tokens: 64
+  - name: burst
+    prompt_class: long
+    input_tokens: 5000
+    max_tokens: 256
+repetitions: 5

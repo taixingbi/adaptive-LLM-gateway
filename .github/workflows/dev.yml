@@ -57,6 +57,6 @@ jobs:
           REGION: ${{ steps.tfvars.outputs.region }}
         run: |
           ECR=$(terraform -chdir=terraform/envs/dev output -raw ecr_repository_url)
-          docker build -t "$ECR:latest" gateway
+          docker build --platform linux/amd64 -t "$ECR:latest" gateway
           docker push "$ECR:latest"
           aws ecs update-service --cluster bedrock-platform-dev-llm --service llm-gateway --force-new-deployment --region "$REGION" || true

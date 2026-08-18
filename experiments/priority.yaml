@@ -1,0 +1,20 @@
+# Experiment D — priority inversion.
+# 80 batch tenants send high traffic; 20 critical tenants stay light.
+# Compare critical-tenant SLO attainment across policies.
+
+name: priority_inversion
+scenario: S4
+backend: us.amazon.nova-micro-v1:0
+policies: [none, rpm, tpm, priority, slo-aware]
+mix:
+  batch:
+    tenants: 80
+    tier: P3
+    traffic: high
+  critical:
+    tenants: 20
+    tier: P1
+    traffic: low
+plot:
+  metric: critical_slo_attainment
+repetitions: 5

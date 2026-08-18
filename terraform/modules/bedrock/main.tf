@@ -21,8 +21,8 @@ variable "models" {
     source_model_id = string
   }))
   default = {
-    nova-lite = { source_model_id = "us.amazon.nova-lite-v1:0" }
-    llama     = { source_model_id = "us.meta.llama3-3-70b-instruct-v1:0" }
+    nova-micro = { source_model_id = "us.amazon.nova-micro-v1:0" }
+    nova-lite  = { source_model_id = "us.amazon.nova-lite-v1:0" }
   }
 }
 

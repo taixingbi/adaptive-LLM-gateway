@@ -9,6 +9,12 @@ github_repo = "bedrock-platform"
 # Image is in ECR; run 2 Fargate tasks behind the ALB.
 desired_count = 2
 
+# Paper experiment knobs. PLATFORM_TPM_BUDGET is a synthetic capacity
+# budget, not "AWS Bedrock only supports 100k TPM".
+admission_policy    = "none"
+platform_tpm_budget = 100000
+run_id              = "dev"
+
 apps = [
   {
     app_id         = "app-002"

@@ -58,15 +58,22 @@ resource "aws_iam_role_policy" "ecs_task" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid      = "BedrockConverse"
-        Effect   = "Allow"
-        Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock:GetInferenceProfile"]
+        Sid    = "BedrockConverse"
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock:Converse",
+          "bedrock:ConverseStream",
+          "bedrock:CountTokens",
+          "bedrock:GetInferenceProfile"
+        ]
         Resource = "*"
       },
       {
-        Sid      = "MarketplaceModelAccess"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "MarketplaceModelAccess"
+        Effect = "Allow"
+        Action = [
           "aws-marketplace:ViewSubscriptions",
           "aws-marketplace:Subscribe"
         ]
@@ -83,7 +90,17 @@ resource "aws_iam_role_policy" "ecs_task" {
         Resource = [
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.name_prefix}-apps",
           "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.name_prefix}-apps/index/*",
-          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.name_prefix}-rate-limits"
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.name_prefix}-rate-limits",
+          "arn:aws:dynamodb:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/${var.name_prefix}-tenants"
+        ]
+      },
+      {
+        Sid    = "ResultsBucket"
+        Effect = "Allow"
+        Action = ["s3:PutObject", "s3:AbortMultipartUpload"]
+        Resource = [
+          "arn:aws:s3:::${var.name_prefix}-exp-results",
+          "arn:aws:s3:::${var.name_prefix}-exp-results/*"
         ]
       },
       {
@@ -157,7 +174,8 @@ resource "aws_iam_role_policy" "github_actions" {
         "ec2:*",
         "cloudwatch:*",
         "application-autoscaling:*",
-        "s3:*"
+        "s3:*",
+        "elasticache:*"
       ]
       Resource = "*"
     }]

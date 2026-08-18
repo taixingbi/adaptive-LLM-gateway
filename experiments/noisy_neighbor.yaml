@@ -1,0 +1,22 @@
+# Experiment B — noisy neighbor. The paper's main story.
+# 99 tenants stay normal; tenant-007 bursts 10x for 3 minutes.
+# Plot SLO / P99 TTFT for the other 99 only.
+
+name: noisy_neighbor
+scenario: S2
+backend: us.amazon.nova-micro-v1:0
+tenants: 100
+victim: tenant-007
+prompt_class: medium
+policies: [none, rpm, tpm, priority, slo-aware]
+phases:
+  - minutes: [0, 3]
+    burst: 1x
+  - minutes: [3, 6]
+    burst: 10x
+  - minutes: [6, 9]
+    burst: 1x
+repetitions: 5
+plot:
+  exclude_victim: true
+  metrics: [p99_ttft, slo_attainment, throttle_rate]
