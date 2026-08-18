@@ -12,6 +12,9 @@ TIERS = [
     (30, "P3", 5000, 1, 1000, 20, 2),
 ]
 
+# Must match gateway Settings.tenant_weight_sum. Reserved TPM = C * weight / WEIGHT_SUM.
+WEIGHT_SUM = sum(count * weight for count, _, _, weight, _, _, _ in TIERS)
+
 
 def tenants() -> list[dict]:
     items: list[dict] = []

@@ -15,8 +15,13 @@ DEFAULT_TENANT = {
     "weight": 2,
 }
 
+_CACHE: dict[str, dict[str, Any]] = {}
+
 
 def get_tenant(table, tenant_id: str) -> dict[str, Any]:
+    cached = _CACHE.get(tenant_id)
+    if cached is not None:
+        return cached
     response = table.get_item(Key={"tenant_id": tenant_id})
     item = response.get("Item")
     if not item:
@@ -24,7 +29,7 @@ def get_tenant(table, tenant_id: str) -> dict[str, Any]:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Unknown tenant '{tenant_id}'",
         )
-    return {
+    parsed = {
         "tenant_id": item["tenant_id"],
         "tier": item.get("tier", DEFAULT_TENANT["tier"]),
         "tpm_limit": int(item.get("tpm_limit", DEFAULT_TENANT["tpm_limit"])),
@@ -34,3 +39,5 @@ def get_tenant(table, tenant_id: str) -> dict[str, Any]:
         "e2e_slo_ms": int(item.get("e2e_slo_ms", DEFAULT_TENANT["e2e_slo_ms"])),
         "weight": int(item.get("weight", DEFAULT_TENANT["weight"])),
     }
+    _CACHE[tenant_id] = parsed
+    return parsed

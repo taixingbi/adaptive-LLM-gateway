@@ -21,6 +21,9 @@ class RequestContext:
     tenant_max_concurrency: int
     platform_tpm_used: int
     platform_tpm_budget: int
+    tenant_bucket_tokens: float = 0.0
+    platform_bucket_tokens: float = 0.0
+    weight_sum: int = 190
 
     @property
     def platform_pressure(self) -> float:
@@ -31,6 +34,12 @@ class RequestContext:
     @property
     def remaining_slack_ms(self) -> float:
         return self.ttft_slo_ms - self.wait_ms - self.estimated_backend_ttft_ms
+
+    @property
+    def reserved_tpm(self) -> float:
+        if self.weight_sum <= 0:
+            return 0.0
+        return self.platform_tpm_budget * self.weight / self.weight_sum
 
 
 @dataclass
@@ -45,17 +54,26 @@ class AdmissionPolicy(Protocol):
     def decide(self, ctx: RequestContext) -> Decision: ...
 
 
-def get_policy(name: str) -> AdmissionPolicy:
-    from app.admission import none, priority, rpm, slo_aware, tpm
+_POLICIES: dict[str, AdmissionPolicy] | None = None
 
-    policies = {
-        "none": none.NonePolicy(),
-        "rpm": rpm.RpmPolicy(),
-        "tpm": tpm.TpmPolicy(),
-        "priority": priority.PriorityPolicy(),
-        "slo-aware": slo_aware.SloAwarePolicy(),
-        "slo_aware": slo_aware.SloAwarePolicy(),
-    }
-    if name not in policies:
-        raise ValueError(f"Unknown admission policy '{name}'. Choose: {sorted(policies)}")
-    return policies[name]
+
+def get_policy(name: str) -> AdmissionPolicy:
+    global _POLICIES
+    if _POLICIES is None:
+        from app.admission import none, priority, rpm, slo_aware, token_bucket, tpm
+
+        _POLICIES = {
+            "none": none.NonePolicy(),
+            "rpm": rpm.RpmPolicy(),
+            "rpm-fixed": rpm.RpmPolicy(),
+            "tpm": tpm.TpmPolicy(),
+            "tpm-fixed": tpm.TpmPolicy(),
+            "token-bucket": token_bucket.TokenBucketPolicy(),
+            "priority": priority.PriorityPolicy(),
+            "slo-aware": slo_aware.SloAwarePolicy(),
+            "slo_aware": slo_aware.SloAwarePolicy(),
+        }
+    try:
+        return _POLICIES[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown admission policy '{name}'. Choose: {sorted(_POLICIES)}") from exc

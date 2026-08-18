@@ -8,7 +8,7 @@ scenario: S1
 backend: us.amazon.nova-micro-v1:0
 tenants: 100
 prompt_class: medium
-policies: [none, rpm, tpm, priority, slo-aware]
+policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
 load_pct: [50, 80, 100, 120, 150]
 duration_s: 300
 repetitions: 3

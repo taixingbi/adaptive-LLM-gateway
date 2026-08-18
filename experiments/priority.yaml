@@ -5,7 +5,7 @@
 name: priority_inversion
 scenario: S4
 backend: us.amazon.nova-micro-v1:0
-policies: [none, rpm, tpm, priority, slo-aware]
+policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
 mix:
   batch:
     tenants: 80

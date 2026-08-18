@@ -28,6 +28,7 @@ def converse_stream(
     messages: list[dict[str, Any]],
     max_tokens: int,
     start_ts: float,
+    collect_text: bool = False,
 ) -> StreamResult:
     """Call Bedrock ConverseStream and measure TTFT from first content event."""
     kwargs = {
@@ -49,10 +50,10 @@ def converse_stream(
             if "contentBlockDelta" in event:
                 if first_token_ts is None:
                     first_token_ts = time.time()
-                delta = event["contentBlockDelta"].get("delta") or {}
-                piece = delta.get("text") or ""
-                if piece:
-                    text_parts.append(piece)
+                if collect_text:
+                    piece = (event["contentBlockDelta"].get("delta") or {}).get("text") or ""
+                    if piece:
+                        text_parts.append(piece)
             elif "metadata" in event:
                 usage = event["metadata"].get("usage") or {}
                 input_tokens = int(usage.get("inputTokens") or input_tokens)

@@ -2,6 +2,12 @@ from app.admission.base import Decision, RequestContext
 
 
 class TpmPolicy:
+    """Fixed calendar-minute TPM window (YYYY-MM-DDTHH:MM).
+
+    Kept as a weak-but-common baseline. Prefer token-bucket as the
+    production-like rate limiter.
+    """
+
     name = "tpm"
 
     def decide(self, ctx: RequestContext) -> Decision:

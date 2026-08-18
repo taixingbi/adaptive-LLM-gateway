@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     experiment_model_id: str = "us.amazon.nova-micro-v1:0"
     estimated_backend_ttft_ms: float = 400.0
     queue_poll_ms: int = 50
+    tenant_weight_sum: int = 190
     redis_url: str = ""
     results_bucket: str = ""
     run_id: str = "local"

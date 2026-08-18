@@ -10,10 +10,16 @@ def minute_key() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
 
 
+def _short_id(tenant_id: str) -> str:
+    return tenant_id.removeprefix("tenant-")
+
+
 class CounterStore(Protocol):
     def get_int(self, key: str) -> int: ...
+    def mget_int(self, keys: list[str]) -> list[int]: ...
     def incr(self, key: str, amount: int = 1, ttl_s: int = 120) -> int: ...
     def incrby(self, key: str, amount: int, ttl_s: int = 120) -> int: ...
+    def incr_many(self, ops: list[tuple[str, int, int]]) -> None: ...
 
 
 class MemoryCounters:
@@ -23,17 +29,22 @@ class MemoryCounters:
         self._lock = threading.Lock()
         self._values: dict[str, tuple[int, float]] = {}
 
-    def _purge(self, now: float) -> None:
-        expired = [k for k, (_, exp) in self._values.items() if exp <= now]
-        for key in expired:
-            del self._values[key]
+    def _read(self, key: str, now: float) -> int:
+        value = self._values.get(key)
+        if value is None or value[1] <= now:
+            self._values.pop(key, None)
+            return 0
+        return value[0]
 
     def get_int(self, key: str) -> int:
         now = time.time()
         with self._lock:
-            self._purge(now)
-            value = self._values.get(key)
-            return 0 if value is None else value[0]
+            return self._read(key, now)
+
+    def mget_int(self, keys: list[str]) -> list[int]:
+        now = time.time()
+        with self._lock:
+            return [self._read(key, now) for key in keys]
 
     def incr(self, key: str, amount: int = 1, ttl_s: int = 120) -> int:
         return self.incrby(key, amount, ttl_s)
@@ -41,11 +52,17 @@ class MemoryCounters:
     def incrby(self, key: str, amount: int, ttl_s: int = 120) -> int:
         now = time.time()
         with self._lock:
-            self._purge(now)
-            current, _ = self._values.get(key, (0, now + ttl_s))
+            current = self._read(key, now)
             next_value = current + amount
             self._values[key] = (next_value, now + ttl_s)
             return next_value
+
+    def incr_many(self, ops: list[tuple[str, int, int]]) -> None:
+        now = time.time()
+        with self._lock:
+            for key, amount, ttl_s in ops:
+                current = self._read(key, now)
+                self._values[key] = (current + amount, now + ttl_s)
 
 
 class RedisCounters:
@@ -61,55 +78,169 @@ class RedisCounters:
         value = self._client.get(key)
         return 0 if value is None else int(value)
 
+    def mget_int(self, keys: list[str]) -> list[int]:
+        values = self._client.mget(keys)
+        return [0 if value is None else int(value) for value in values]
+
     def incr(self, key: str, amount: int = 1, ttl_s: int = 120) -> int:
         return self.incrby(key, amount, ttl_s)
 
     def incrby(self, key: str, amount: int, ttl_s: int = 120) -> int:
-        pipe = self._client.pipeline()
+        pipe = self._client.pipeline(transaction=False)
         pipe.incrby(key, amount)
         pipe.expire(key, ttl_s)
-        results = pipe.execute()
-        return int(results[0])
+        return int(pipe.execute()[0])
+
+    def incr_many(self, ops: list[tuple[str, int, int]]) -> None:
+        pipe = self._client.pipeline(transaction=False)
+        for key, amount, ttl_s in ops:
+            pipe.incrby(key, amount)
+            pipe.expire(key, ttl_s)
+        pipe.execute()
+
+    def bucket_op(self, key: str, cap: float, now: float, cost: float) -> float:
+        result = self._client.eval(_BUCKET_LUA, 1, key, cap, now, cost)
+        return float(result)
+
+    def bucket_ops(self, ops: list[tuple[str, float, float, float]]) -> list[float]:
+        pipe = self._client.pipeline(transaction=False)
+        for key, cap, now, cost in ops:
+            pipe.eval(_BUCKET_LUA, 1, key, cap, now, cost)
+        return [float(value) for value in pipe.execute()]
+
+
+_BUCKET_LUA = """
+local key = KEYS[1]
+local cap = tonumber(ARGV[1])
+local now = tonumber(ARGV[2])
+local cost = tonumber(ARGV[3])
+local rate = cap / 60.0
+local tokens = tonumber(redis.call('HGET', key, 'tokens'))
+local ts = tonumber(redis.call('HGET', key, 'ts'))
+if tokens == nil then
+  tokens = cap
+  ts = now
+end
+tokens = math.min(cap, tokens + (now - ts) * rate)
+if cost > 0 and tokens < cost then
+  redis.call('HSET', key, 'tokens', tostring(tokens), 'ts', tostring(now))
+  redis.call('EXPIRE', key, 180)
+  return -1
+end
+if cost > 0 then
+  tokens = tokens - cost
+end
+redis.call('HSET', key, 'tokens', tostring(tokens), 'ts', tostring(now))
+redis.call('EXPIRE', key, 180)
+return tokens
+"""
 
 
 class QuotaCounters:
     def __init__(self, store: CounterStore) -> None:
         self.store = store
+        self._mem_lock = threading.Lock()
+        self._mem_buckets: dict[str, tuple[float, float]] = {}
 
-    def snapshot(self, tenant_id: str) -> dict[str, int]:
+    def snapshot(
+        self,
+        tenant_id: str,
+        *,
+        tenant_tpm_limit: int = 0,
+        platform_tpm_budget: int = 0,
+        use_buckets: bool = True,
+    ) -> dict[str, int | float]:
         window = minute_key()
-        short = tenant_id.replace("tenant-", "")
+        short = _short_id(tenant_id)
+        keys = [
+            f"platform:tpm:{window}",
+            f"tenant:{short}:tpm:{window}",
+            f"tenant:{short}:rpm:{window}",
+            f"tenant:{short}:concurrency",
+            "platform:queue_depth",
+        ]
+        platform_tpm, tenant_tpm, tenant_rpm, tenant_concurrency, queue_depth = self.store.mget_int(keys)
+        tenant_bucket = 0.0
+        platform_bucket = 0.0
+        if use_buckets and tenant_tpm_limit > 0 and platform_tpm_budget > 0:
+            now = time.time()
+            tenant_bucket, platform_bucket = self._bucket_ops(
+                [
+                    (f"bucket:tenant:{short}", float(tenant_tpm_limit), now, 0.0),
+                    ("bucket:platform", float(platform_tpm_budget), now, 0.0),
+                ]
+            )
+        elif use_buckets and tenant_tpm_limit > 0:
+            tenant_bucket = self._bucket_op(f"bucket:tenant:{short}", float(tenant_tpm_limit), time.time(), 0.0)
         return {
-            "platform_tpm": self.store.get_int(f"platform:tpm:{window}"),
-            "tenant_tpm": self.store.get_int(f"tenant:{short}:tpm:{window}"),
-            "tenant_rpm": self.store.get_int(f"tenant:{short}:rpm:{window}"),
-            "tenant_concurrency": self.store.get_int(f"tenant:{short}:concurrency"),
-            "queue_depth": self.store.get_int("platform:queue_depth"),
+            "platform_tpm": platform_tpm,
+            "tenant_tpm": tenant_tpm,
+            "tenant_rpm": tenant_rpm,
+            "tenant_concurrency": tenant_concurrency,
+            "queue_depth": queue_depth,
+            "tenant_bucket": tenant_bucket,
+            "platform_bucket": platform_bucket,
         }
 
-    def record_admit(self, tenant_id: str, estimated_tokens: int) -> None:
+    def record_admit(
+        self,
+        tenant_id: str,
+        estimated_tokens: int,
+        *,
+        tenant_tpm_limit: int = 0,
+        platform_tpm_budget: int = 0,
+        use_buckets: bool = True,
+    ) -> None:
         window = minute_key()
-        short = tenant_id.replace("tenant-", "")
-        self.store.incrby(f"platform:tpm:{window}", estimated_tokens)
-        self.store.incrby(f"tenant:{short}:tpm:{window}", estimated_tokens)
-        self.store.incr(f"tenant:{short}:rpm:{window}")
-        self.store.incr(f"tenant:{short}:admitted")
-        self.store.incr(f"tenant:{short}:concurrency", ttl_s=3600)
+        short = _short_id(tenant_id)
+        self.store.incr_many(
+            [
+                (f"platform:tpm:{window}", estimated_tokens, 120),
+                (f"tenant:{short}:tpm:{window}", estimated_tokens, 120),
+                (f"tenant:{short}:rpm:{window}", 1, 120),
+                (f"tenant:{short}:admitted", 1, 86400),
+                (f"tenant:{short}:concurrency", 1, 3600),
+            ]
+        )
+        if use_buckets and tenant_tpm_limit > 0:
+            now = time.time()
+            ops = [(f"bucket:tenant:{short}", float(tenant_tpm_limit), now, float(estimated_tokens))]
+            if platform_tpm_budget > 0:
+                ops.append(("bucket:platform", float(platform_tpm_budget), now, float(estimated_tokens)))
+            self._bucket_ops(ops)
 
     def release_concurrency(self, tenant_id: str) -> None:
-        short = tenant_id.replace("tenant-", "")
-        self.store.incr(f"tenant:{short}:concurrency", amount=-1, ttl_s=3600)
+        self.store.incr(f"tenant:{_short_id(tenant_id)}:concurrency", amount=-1, ttl_s=3600)
 
     def record_reject(self, tenant_id: str) -> None:
-        short = tenant_id.replace("tenant-", "")
-        self.store.incr(f"tenant:{short}:rejected")
+        self.store.incr(f"tenant:{_short_id(tenant_id)}:rejected", ttl_s=86400)
 
     def record_slo_violation(self, tenant_id: str) -> None:
-        short = tenant_id.replace("tenant-", "")
-        self.store.incr(f"tenant:{short}:slo_violations")
+        self.store.incr(f"tenant:{_short_id(tenant_id)}:slo_violations", ttl_s=86400)
 
     def adjust_queue(self, delta: int) -> None:
         self.store.incr("platform:queue_depth", amount=delta, ttl_s=3600)
+
+    def _bucket_op(self, key: str, cap: float, now: float, cost: float) -> float:
+        return self._bucket_ops([(key, cap, now, cost)])[0]
+
+    def _bucket_ops(self, ops: list[tuple[str, float, float, float]]) -> list[float]:
+        if isinstance(self.store, RedisCounters):
+            return self.store.bucket_ops(ops)
+        with self._mem_lock:
+            out: list[float] = []
+            for key, cap, now, cost in ops:
+                tokens, ts = self._mem_buckets.get(key, (cap, now))
+                tokens = min(cap, tokens + (now - ts) * (cap / 60.0))
+                if cost > 0 and tokens < cost:
+                    self._mem_buckets[key] = (tokens, now)
+                    out.append(-1.0)
+                    continue
+                if cost > 0:
+                    tokens -= cost
+                self._mem_buckets[key] = (tokens, now)
+                out.append(tokens)
+            return out
 
 
 def build_counters(redis_url: str) -> QuotaCounters:

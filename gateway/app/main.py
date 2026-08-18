@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import time
+from functools import lru_cache
 from typing import Any
 
 import boto3
@@ -28,6 +29,7 @@ app = FastAPI(title="bedrock-platform LLM Gateway", version="0.2.0")
 settings = get_settings()
 model_map = load_model_map(settings.model_map_json)
 policy = get_policy(settings.admission_policy)
+USE_BUCKETS = policy.name == "token-bucket"
 counters: QuotaCounters = build_counters(settings.redis_url)
 
 session = boto3.Session(region_name=settings.aws_region)
@@ -115,11 +117,17 @@ def converse(payload: dict[str, Any], request: Request) -> JSONResponse:
         "stopReason": response.get("stopReason"),
         "usage": response.get("usage"),
     }
-    return JSONResponse(content=json.loads(json.dumps(body, default=str)))
+    return JSONResponse(content=_jsonable(body))
 
 
 @app.post("/v1/infer")
 async def infer(payload: dict[str, Any]) -> JSONResponse:
+    """Experiment path. Tenant identity is injected by the load generator.
+
+    Production traffic uses POST /v1/converse with SigV4-authenticated
+    principals mapped through DynamoDB. Do not treat client-supplied
+    tenant_id as a production auth mechanism.
+    """
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
         raise HTTPException(status_code=400, detail="Body must include tenant_id")
@@ -130,8 +138,9 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
     estimated_input = int(payload.get("input_tokens") or defaults["input_tokens"])
     max_tokens = int(payload.get("max_tokens") or defaults["max_tokens"])
     estimated_tokens = estimated_input + max_tokens
+    prompt = payload.get("prompt")
     messages = payload.get("messages") or [
-        {"role": "user", "content": [{"text": payload.get("prompt") or _default_prompt(prompt_class)}]}
+        {"role": "user", "content": [{"text": prompt if prompt else _default_prompt(prompt_class)}]}
     ]
 
     arrival_ts = time.time()
@@ -167,7 +176,13 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
 
     admit_ts = time.time()
     event["admit_ts"] = admit_ts
-    counters.record_admit(tenant_id, estimated_tokens)
+    counters.record_admit(
+        tenant_id,
+        estimated_tokens,
+        tenant_tpm_limit=tenant["tpm_limit"],
+        platform_tpm_budget=settings.platform_tpm_budget,
+        use_buckets=USE_BUCKETS,
+    )
     try:
         stream = converse_stream(
             bedrock,
@@ -175,6 +190,7 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
             messages=messages,
             max_tokens=max_tokens,
             start_ts=admit_ts,
+            collect_text=bool(payload.get("include_output")),
         )
     finally:
         counters.release_concurrency(tenant_id)
@@ -202,8 +218,10 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
         status_code = 429
     elif stream.bedrock_5xx:
         status_code = 502
-    body = {**event, "output_text": stream.text, "error": stream.error}
-    return JSONResponse(status_code=status_code, content=json.loads(json.dumps(body, default=str)))
+    body = {**event, "error": stream.error}
+    if stream.text:
+        body["output_text"] = stream.text
+    return JSONResponse(status_code=status_code, content=_jsonable(body))
 
 
 async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: float) -> tuple[Decision, float]:
@@ -212,7 +230,12 @@ async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: floa
     try:
         while True:
             wait_ms = (time.time() - arrival_ts) * 1000
-            snap = counters.snapshot(tenant["tenant_id"])
+            snap = counters.snapshot(
+                tenant["tenant_id"],
+                tenant_tpm_limit=tenant["tpm_limit"],
+                platform_tpm_budget=settings.platform_tpm_budget,
+                use_buckets=USE_BUCKETS,
+            )
             ctx = RequestContext(
                 tenant_id=tenant["tenant_id"],
                 tier=tenant["tier"],
@@ -221,14 +244,17 @@ async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: floa
                 wait_ms=wait_ms,
                 ttft_slo_ms=tenant["ttft_slo_ms"],
                 estimated_backend_ttft_ms=settings.estimated_backend_ttft_ms,
-                tenant_tpm_used=snap["tenant_tpm"],
+                tenant_tpm_used=int(snap["tenant_tpm"]),
                 tenant_tpm_limit=tenant["tpm_limit"],
-                tenant_rpm_used=snap["tenant_rpm"],
+                tenant_rpm_used=int(snap["tenant_rpm"]),
                 tenant_rpm_limit=tenant["rpm_limit"],
-                tenant_concurrency=snap["tenant_concurrency"],
+                tenant_concurrency=int(snap["tenant_concurrency"]),
                 tenant_max_concurrency=tenant["max_concurrency"],
-                platform_tpm_used=snap["platform_tpm"],
+                platform_tpm_used=int(snap["platform_tpm"]),
                 platform_tpm_budget=settings.platform_tpm_budget,
+                tenant_bucket_tokens=float(snap["tenant_bucket"]),
+                platform_bucket_tokens=float(snap["platform_bucket"]),
+                weight_sum=settings.tenant_weight_sum,
             )
             decision = policy.decide(ctx)
             if decision.action == "ADMIT":
@@ -246,7 +272,12 @@ async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: floa
             counters.adjust_queue(-1)
 
 
+@lru_cache(maxsize=8)
 def _default_prompt(prompt_class: str) -> str:
     seed = "Summarize the following enterprise operations note in one sentence. "
     repeats = {"short": 8, "medium": 70, "long": 280}.get(prompt_class, 70)
     return seed + ("The queue depth is rising and latency SLOs are at risk. " * repeats)
+
+
+def _jsonable(value: Any) -> Any:
+    return json.loads(json.dumps(value, default=str))

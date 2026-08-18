@@ -6,7 +6,7 @@ name: token_burst
 scenario: S3
 backend: us.amazon.nova-micro-v1:0
 rpm: 500
-policies: [none, rpm, tpm, priority, slo-aware]
+policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
 phases:
   - name: normal
     prompt_class: short

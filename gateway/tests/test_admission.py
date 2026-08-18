@@ -79,3 +79,42 @@ def test_slo_aware_low_pressure_admits() -> None:
     decision = get_policy("slo-aware").decide(_ctx(platform_tpm_used=10000))
     assert decision.action == "ADMIT"
     assert decision.reason == "slo-low-pressure"
+
+
+def test_slo_aware_p1_does_not_break_hard_ceiling() -> None:
+    policy = get_policy("slo-aware")
+    over_reserved = policy.decide(
+        _ctx(
+            tier="P1",
+            weight=4,
+            platform_tpm_used=105000,
+            tenant_tpm_used=5000,
+            estimated_tokens=500,
+        )
+    )
+    hard = policy.decide(_ctx(tier="P1", platform_tpm_used=110000))
+    reserved = policy.decide(
+        _ctx(
+            tier="P1",
+            weight=4,
+            platform_tpm_used=105000,
+            tenant_tpm_used=0,
+            estimated_tokens=500,
+        )
+    )
+    assert over_reserved.action == "QUEUE"
+    assert over_reserved.reason == "slo-over-capacity"
+    assert hard.action == "REJECT"
+    assert hard.reason == "slo-hard-shed"
+    assert reserved.action == "ADMIT"
+    assert reserved.reason == "slo-reserved"
+
+
+def test_token_bucket_queues_when_empty() -> None:
+    policy = get_policy("token-bucket")
+    ok = policy.decide(_ctx(tenant_bucket_tokens=800, platform_bucket_tokens=5000, estimated_tokens=500))
+    empty = policy.decide(_ctx(tenant_bucket_tokens=100, platform_bucket_tokens=5000, estimated_tokens=500))
+    assert ok.action == "ADMIT"
+    assert empty.action == "QUEUE"
+    assert get_policy("tpm-fixed").name == "tpm"
+    assert get_policy("rpm-fixed").name == "rpm"

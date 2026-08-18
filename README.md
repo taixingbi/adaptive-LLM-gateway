@@ -2,7 +2,26 @@
 
 One Bedrock control plane per environment. Spoke accounts call the gateway with IAM SigV4. Apps are DynamoDB metadata, not one inference profile per app.
 
-The same gateway is also the paper experiment platform: **real Bedrock backend**, with overload and multi-tenant capacity enforced in the gateway (not by claiming a smaller AWS quota).
+The same repo is the paper evaluation harness: **real Bedrock backend**, with overload and multi-tenant capacity enforced in the gateway (not by claiming a smaller AWS quota).
+
+```
+Production platform                         Research evaluation
+────────────────────                        ───────────────────
+Spoke AWS accounts                          Locust virtual users
+       ↓                                           ↓
+IAM SigV4                                   POST /v1/infer
+       ↓                                    (tenant_id from loadgen)
+API Gateway                                        ↓
+       ↓                                    100 logical tenants
+POST /v1/converse                           DynamoDB TenantPolicy
+       ↓                                           ↓
+DynamoDB principal → app                    none | rpm | tpm | token-bucket
+       ↓                                    priority | slo-aware
+Bedrock CRIS                                       ↓
+                                            Redis counters
+                                            Bedrock Nova Micro
+                                            S3 JSONL
+```
 
 ## Accounts
 
@@ -38,12 +57,12 @@ Then the `dev` workflow can assume `github-actions-bedrock-platform`.
 ```bash
 ECR=$(terraform -chdir=terraform/envs/dev output -raw ecr_repository_url)
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin "$ECR"
-docker build -t "$ECR:latest" gateway
+docker build --platform linux/amd64 -t "$ECR:latest" gateway
 docker push "$ECR:latest"
 ```
 
 5. Set `desired_count = 2` in `terraform/envs/dev/terraform.tfvars` and apply again.
-6. Seed 100 logical tenants (one AWS account):
+6. Seed 100 logical tenants (one AWS account, `tenant-001` … `tenant-100`):
 
 ```bash
 python3 scripts/seed_tenants.py --table "$(terraform -chdir=terraform/envs/dev output -raw tenants_table_name)"
@@ -53,25 +72,39 @@ python3 scripts/seed_tenants.py --table "$(terraform -chdir=terraform/envs/dev o
 
 ```bash
 chmod +x scripts/invoke.sh scripts/infer.sh
-./scripts/invoke.sh                          # IAM demo: app-002 → Nova Lite
-./scripts/infer.sh tenant-001 short          # experiment path: Nova Micro + admission
+./scripts/invoke.sh                          # production path: SigV4 → app-002 → Nova Lite
+./scripts/infer.sh tenant-001 short          # experiment path: loadgen tenant_id → Nova Micro
 ```
 
-## Experiment architecture
+## Auth
 
-```
-Locust  →  API Gateway (IAM)  →  ALB  →  ECS Fargate gateway
-                                      →  ElastiCache Serverless (counters)
-                                      →  DynamoDB (tenant policy)
-                                      →  Bedrock ConverseStream (Nova Micro)
-                                      →  S3 JSONL  +  CloudWatch
-```
+**Production** (`POST /v1/converse`): callers use `execute-api:Invoke` with SigV4. API Gateway maps `$context.identity.userArn` to `x-caller-arn`. The gateway looks up that principal (STS assumed-role ARNs are normalized to IAM role ARNs) in DynamoDB.
 
-Paper contribution is `gateway/app/admission/slo_aware.py` plus the workload in `experiments/`. AWS, ECS, Redis, DynamoDB, and Bedrock are infrastructure.
+**Experiments** (`POST /v1/infer`): Locust injects `tenant_id` in the body so 100 logical enterprise tenants can share one gateway. This is **not** a production auth mechanism. Paper wording: *For controlled experiments, tenant identities are injected by the workload generator; the production gateway uses SigV4-authenticated principals.*
+
+## Admission policies
+
+| `admission_policy` | Role |
+|---|---|
+| `none` | No control |
+| `rpm` / `rpm-fixed` | Calendar-minute request limiter |
+| `tpm` / `tpm-fixed` | Calendar-minute token window (resets at `HH:MM`) |
+| `token-bucket` | Stronger TPM baseline: continuous refill, no minute-boundary reset |
+| `priority` | Weighted / tier-aware under pressure |
+| `slo-aware` | Paper controller |
+
+`slo-aware` slack is `TTFT_SLO − wait − estimated backend TTFT`. Capacity bands:
+
+- pressure < 0.8: admit
+- 0.8–1.0: SLO / priority-aware
+- 1.0–1.1: only reserved share (`C × weight / 190`)
+- ≥ 1.1: hard shed
+
+Shared quota state lives in **ElastiCache Serverless** (`gateway/app/counters.py`) so gateway replicas see the same TPM/RPM/concurrency/token-bucket values.
 
 | Knob | Where | Notes |
 |---|---|---|
-| `admission_policy` | `terraform.tfvars` | `none`, `rpm`, `tpm`, `priority`, `slo-aware` |
+| `admission_policy` | `terraform.tfvars` | See table above |
 | `platform_tpm_budget` | `terraform.tfvars` | Synthetic **C**. Sweep load as % of C |
 | Tenants | `loadgen/tenants.yaml` | 10×P1 / 60×P2 / 30×P3 |
 | Prompts | `loadgen/prompts/` | Known token demand; no CountTokens on the hot path |
@@ -80,7 +113,7 @@ Scenarios (do not Cartesian-product every axis):
 
 - `experiments/load_sweep.yaml` — 50/80/100/120/150% of C
 - `experiments/noisy_neighbor.yaml` — tenant-007 10× burst; plot the other 99
-- `experiments/token_burst.yaml` — constant RPM, token size jump
+- `experiments/token_burst.yaml` — constant RPM, token size jump (RPM limiter is blind; TPM/SLO are not)
 - `experiments/priority.yaml` — batch vs critical SLO
 
 First run 10 tenants / 20 RPM / 5 minutes and confirm TTFT, Redis counters, and S3 JSONL. Then algorithms. Full 100-tenant matrix last.
@@ -95,14 +128,10 @@ LOADGEN_ROLE_ARN=$(terraform -chdir=terraform/envs/dev output -json sample_role_
   locust -f loadgen/locustfile.py --users 10 --spawn-rate 2 --run-time 5m --headless
 
 # Plots from gateway events (source of truth)
-python3 analysis/plots.py s3://$(terraform -chdir=terraform/envs/dev output -raw results_bucket)/results
+python3 analysis/plots.py /path/to/downloaded/jsonl
 ```
 
-Download JSONL from the results bucket before plotting if you are not using `s3://` directly (`plots.py` reads a local directory of `.jsonl` files).
-
-## Auth
-
-Callers use `execute-api:Invoke` with SigV4. API Gateway maps `$context.identity.userArn` to `x-caller-arn`. The gateway looks up that principal (STS assumed-role ARNs are normalized to IAM role ARNs) in DynamoDB. `/v1/infer` is the experiment API: tenant identity is `tenant_id` in the body (100 logical apps, not 100 AWS accounts).
+Download JSONL from the results bucket before plotting (`plots.py` reads a local directory of `.jsonl` files).
 
 ## Capacity
 
