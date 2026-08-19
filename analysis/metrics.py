@@ -23,12 +23,19 @@ def summarize(events: list[dict], exclude_tenants: set[str] | None = None) -> di
     n = len(rows) or 1
     admitted = [e for e in rows if e.get("decision") == "ADMIT"]
     ttfts = sorted(e["ttft_ms"] for e in admitted if e.get("ttft_ms") is not None)
-    slo = sum(1 for e in admitted if e.get("slo_met")) / max(len(admitted), 1)
+    admitted_n = len(admitted)
+    admitted_slo_n = sum(1 for e in admitted if e.get("slo_met"))
+    conditional_slo = admitted_slo_n / max(admitted_n, 1)
+    # Effective SLO success over all offered requests.
+    slo_goodput = admitted_slo_n / n
     return {
         "requests": len(rows),
-        "admit_rate": len(admitted) / n,
+        "admit_rate": admitted_n / n,
         "reject_rate": sum(1 for e in rows if e.get("decision") == "REJECT") / n,
-        "slo_attainment": slo,
+        # Backward-compatibility alias. This is SLO among admitted requests.
+        "slo_attainment": conditional_slo,
+        "conditional_slo_attainment": conditional_slo,
+        "slo_goodput": slo_goodput,
         "p50_ttft_ms": _pct(ttfts, 0.50),
         "p99_ttft_ms": _pct(ttfts, 0.99),
         "bedrock_429_rate": sum(1 for e in rows if e.get("bedrock_429")) / n,
@@ -47,9 +54,12 @@ def _by_tier(rows: list[dict]) -> dict[str, dict]:
 
 def summarize_simple(rows: list[dict]) -> dict:
     admitted = [e for e in rows if e.get("decision") == "ADMIT"]
+    admitted_slo_n = sum(1 for e in admitted if e.get("slo_met"))
     return {
         "n": len(rows),
-        "slo_attainment": sum(1 for e in admitted if e.get("slo_met")) / max(len(admitted), 1),
+        "slo_attainment": admitted_slo_n / max(len(admitted), 1),
+        "conditional_slo_attainment": admitted_slo_n / max(len(admitted), 1),
+        "slo_goodput": admitted_slo_n / max(len(rows), 1),
         "admit_rate": len(admitted) / max(len(rows), 1),
     }
 
