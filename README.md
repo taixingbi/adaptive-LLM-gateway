@@ -116,7 +116,24 @@ Scenarios (do not Cartesian-product every axis):
 - `experiments/token_burst.yaml` — constant RPM, token size jump (RPM limiter is blind; TPM/SLO are not)
 - `experiments/priority.yaml` — batch vs critical SLO
 
-First run 10 tenants / 20 RPM / 5 minutes and confirm TTFT, Redis counters, and S3 JSONL. Then algorithms. Full 100-tenant matrix last.
+First run 10 tenants smoke, then a noisy-neighbor pilot. YAML files are executed by the runner, not just documentation:
+
+```bash
+python3.11 -m venv .venv
+.venv/bin/pip install -r loadgen/requirements.txt -r analysis/requirements.txt
+
+# 10-tenant smoke against whatever policy the gateway already runs
+.venv/bin/python scripts/run_experiment.py experiments/noisy_neighbor.yaml --policy none --smoke --skip-deploy
+
+# Switch ECS policy + run_id, then Locust (slow: terraform apply)
+.venv/bin/python scripts/run_experiment.py experiments/noisy_neighbor.yaml --policy slo-aware --smoke --deploy
+
+# Paper matrix (6 policies × 5 reps). Victim tenant-007 bursts 10x; summary excludes them.
+.venv/bin/python scripts/run_experiment.py experiments/noisy_neighbor.yaml --all-policies --deploy
+```
+
+Locust users are 1:1 with tenants. Each tenant has its own RPM and prompt class (`loadgen/traffic.py`): P1 5–15 RPM short/medium, P2 5–20 mixed, P3 1–10 medium/long, then skew so the busiest 10 tenants carry ~45% of traffic.
+
 
 ```bash
 # Offline token stamp (once per prompt set)

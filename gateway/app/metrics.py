@@ -40,7 +40,7 @@ class ResultWriter:
         self._thread.join(timeout=5)
 
     def _run(self) -> None:
-        buf: list[str] = []
+        buf: list[dict[str, Any]] = []
         while True:
             try:
                 item = self._q.get(timeout=1.0)
@@ -53,14 +53,16 @@ class ResultWriter:
                 if buf:
                     self._put(buf)
                 return
-            buf.append(json.dumps(item, default=str, separators=(",", ":")))
+            buf.append(item)
             if len(buf) >= self._flush_every:
                 self._put(buf)
                 buf = []
 
-    def _put(self, lines: list[str]) -> None:
+    def _put(self, events: list[dict[str, Any]]) -> None:
+        lines = [json.dumps(event, default=str, separators=(",", ":")) for event in events]
+        run_id = events[0].get("run_id") or self._run_id
         day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        key = f"results/{self._run_id}/{day}/{uuid.uuid4()}.jsonl"
+        key = f"results/{run_id}/{day}/{uuid.uuid4()}.jsonl"
         try:
             self._s3.put_object(
                 Bucket=self._bucket,

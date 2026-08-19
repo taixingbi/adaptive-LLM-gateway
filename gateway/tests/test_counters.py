@@ -1,4 +1,12 @@
-from app.counters import MemoryCounters, QuotaCounters
+from app.counters import MemoryCounters, QuotaCounters, _k
+
+
+def test_cluster_keys_share_hash_tag() -> None:
+    store = MemoryCounters()
+    QuotaCounters(store).record_admit("tenant-007", 10)
+    assert store._values
+    assert all(key.startswith("{q}:") for key in store._values)
+    assert _k("tenant", "007", "tpm", "x").startswith("{q}:")
 
 
 def test_minute_snapshot_and_admit() -> None:
@@ -23,7 +31,7 @@ def test_token_bucket_refills_instead_of_minute_reset() -> None:
     counters.record_admit("tenant-007", 5500, tenant_tpm_limit=6000)
     after = counters.snapshot("tenant-007", tenant_tpm_limit=6000)["tenant_bucket"]
     assert 0 < after < 600
-    tokens, _ = counters._mem_buckets["bucket:tenant:007"]
-    counters._mem_buckets["bucket:tenant:007"] = (tokens, time.time() - 30)
+    tokens, _ = counters._mem_buckets["{q}:bucket:tenant:007"]
+    counters._mem_buckets["{q}:bucket:tenant:007"] = (tokens, time.time() - 30)
     refilled = counters.snapshot("tenant-007", tenant_tpm_limit=6000)["tenant_bucket"]
     assert refilled > tokens + 2000

@@ -30,7 +30,7 @@ class SloAwarePolicy:
         if pressure >= self.hard_shed_pressure:
             return Decision(action="REJECT", reason="slo-hard-shed")
         if pressure >= self.capacity_pressure:
-            if tenant_next <= ctx.reserved_tpm:
+            if ctx.tenant_tpm_used < ctx.reserved_tpm:
                 return Decision(action="ADMIT", reason="slo-reserved")
             return Decision(action="QUEUE", reason="slo-over-capacity")
         if pressure < self.soft_pressure:

@@ -110,6 +110,21 @@ def test_slo_aware_p1_does_not_break_hard_ceiling() -> None:
     assert reserved.reason == "slo-reserved"
 
 
+def test_slo_aware_reserved_admits_request_larger_than_fair_share() -> None:
+    """P1 reserved share is ~2105 TPM at C=100k; a medium request is ~2200."""
+    decision = get_policy("slo-aware").decide(
+        _ctx(
+            tier="P1",
+            weight=4,
+            platform_tpm_used=105000,
+            tenant_tpm_used=0,
+            estimated_tokens=2200,
+        )
+    )
+    assert decision.action == "ADMIT"
+    assert decision.reason == "slo-reserved"
+
+
 def test_token_bucket_queues_when_empty() -> None:
     policy = get_policy("token-bucket")
     ok = policy.decide(_ctx(tenant_bucket_tokens=800, platform_bucket_tokens=5000, estimated_tokens=500))

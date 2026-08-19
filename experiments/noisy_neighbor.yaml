@@ -2,9 +2,14 @@
 # 99 tenants stay normal; tenant-007 bursts 10x for 3 minutes.
 # Plot SLO / P99 TTFT for the other 99 only.
 
+# Offered load is calibrated to platform_tpm_budget (synthetic C).
+# tenant-007 may exceed C during the 10x burst; P1 tpm_limit is above C
+# so the interesting constraint is platform admission, not the tenant cap.
+
 name: noisy_neighbor
 scenario: S2
 backend: us.amazon.nova-micro-v1:0
+platform_tpm_budget: 100000
 tenants: 100
 victim: tenant-007
 prompt_class: medium
@@ -20,3 +25,10 @@ repetitions: 5
 plot:
   exclude_victim: true
   metrics: [p99_ttft, slo_attainment, throttle_rate]
+smoke:
+  tenants: 10
+  duration_s: 180
+traffic:
+  # Heterogeneous RPM / prompt mix; see loadgen/traffic.py
+  skew: [0.45, 0.30, 0.25]
+

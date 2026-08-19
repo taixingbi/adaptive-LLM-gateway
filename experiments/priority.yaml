@@ -5,6 +5,8 @@
 name: priority_inversion
 scenario: S4
 backend: us.amazon.nova-micro-v1:0
+tenants: 100
+duration_s: 300
 policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
 mix:
   batch:
@@ -18,3 +20,6 @@ mix:
 plot:
   metric: critical_slo_attainment
 repetitions: 5
+smoke:
+  tenants: 10
+  duration_s: 120

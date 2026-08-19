@@ -14,6 +14,11 @@ def _short_id(tenant_id: str) -> str:
     return tenant_id.removeprefix("tenant-")
 
 
+def _k(*parts: str) -> str:
+    """One hash tag so ElastiCache Serverless (cluster mode) accepts MGET."""
+    return "{q}:" + ":".join(parts)
+
+
 class CounterStore(Protocol):
     def get_int(self, key: str) -> int: ...
     def mget_int(self, keys: list[str]) -> list[int]: ...
@@ -79,8 +84,11 @@ class RedisCounters:
         return 0 if value is None else int(value)
 
     def mget_int(self, keys: list[str]) -> list[int]:
-        values = self._client.mget(keys)
-        return [0 if value is None else int(value) for value in values]
+        # Per-key GET is valid on cluster even if a caller omits the hash tag.
+        pipe = self._client.pipeline(transaction=False)
+        for key in keys:
+            pipe.get(key)
+        return [0 if value is None else int(value) for value in pipe.execute()]
 
     def incr(self, key: str, amount: int = 1, ttl_s: int = 120) -> int:
         return self.incrby(key, amount, ttl_s)
@@ -153,11 +161,11 @@ class QuotaCounters:
         window = minute_key()
         short = _short_id(tenant_id)
         keys = [
-            f"platform:tpm:{window}",
-            f"tenant:{short}:tpm:{window}",
-            f"tenant:{short}:rpm:{window}",
-            f"tenant:{short}:concurrency",
-            "platform:queue_depth",
+            _k("platform", "tpm", window),
+            _k("tenant", short, "tpm", window),
+            _k("tenant", short, "rpm", window),
+            _k("tenant", short, "concurrency"),
+            _k("platform", "queue_depth"),
         ]
         platform_tpm, tenant_tpm, tenant_rpm, tenant_concurrency, queue_depth = self.store.mget_int(keys)
         tenant_bucket = 0.0
@@ -166,12 +174,12 @@ class QuotaCounters:
             now = time.time()
             tenant_bucket, platform_bucket = self._bucket_ops(
                 [
-                    (f"bucket:tenant:{short}", float(tenant_tpm_limit), now, 0.0),
-                    ("bucket:platform", float(platform_tpm_budget), now, 0.0),
+                    (_k("bucket", "tenant", short), float(tenant_tpm_limit), now, 0.0),
+                    (_k("bucket", "platform"), float(platform_tpm_budget), now, 0.0),
                 ]
             )
         elif use_buckets and tenant_tpm_limit > 0:
-            tenant_bucket = self._bucket_op(f"bucket:tenant:{short}", float(tenant_tpm_limit), time.time(), 0.0)
+            tenant_bucket = self._bucket_op(_k("bucket", "tenant", short), float(tenant_tpm_limit), time.time(), 0.0)
         return {
             "platform_tpm": platform_tpm,
             "tenant_tpm": tenant_tpm,
@@ -195,31 +203,31 @@ class QuotaCounters:
         short = _short_id(tenant_id)
         self.store.incr_many(
             [
-                (f"platform:tpm:{window}", estimated_tokens, 120),
-                (f"tenant:{short}:tpm:{window}", estimated_tokens, 120),
-                (f"tenant:{short}:rpm:{window}", 1, 120),
-                (f"tenant:{short}:admitted", 1, 86400),
-                (f"tenant:{short}:concurrency", 1, 3600),
+                (_k("platform", "tpm", window), estimated_tokens, 120),
+                (_k("tenant", short, "tpm", window), estimated_tokens, 120),
+                (_k("tenant", short, "rpm", window), 1, 120),
+                (_k("tenant", short, "admitted"), 1, 86400),
+                (_k("tenant", short, "concurrency"), 1, 3600),
             ]
         )
         if use_buckets and tenant_tpm_limit > 0:
             now = time.time()
-            ops = [(f"bucket:tenant:{short}", float(tenant_tpm_limit), now, float(estimated_tokens))]
+            ops = [(_k("bucket", "tenant", short), float(tenant_tpm_limit), now, float(estimated_tokens))]
             if platform_tpm_budget > 0:
-                ops.append(("bucket:platform", float(platform_tpm_budget), now, float(estimated_tokens)))
+                ops.append((_k("bucket", "platform"), float(platform_tpm_budget), now, float(estimated_tokens)))
             self._bucket_ops(ops)
 
     def release_concurrency(self, tenant_id: str) -> None:
-        self.store.incr(f"tenant:{_short_id(tenant_id)}:concurrency", amount=-1, ttl_s=3600)
+        self.store.incr(_k("tenant", _short_id(tenant_id), "concurrency"), amount=-1, ttl_s=3600)
 
     def record_reject(self, tenant_id: str) -> None:
-        self.store.incr(f"tenant:{_short_id(tenant_id)}:rejected", ttl_s=86400)
+        self.store.incr(_k("tenant", _short_id(tenant_id), "rejected"), ttl_s=86400)
 
     def record_slo_violation(self, tenant_id: str) -> None:
-        self.store.incr(f"tenant:{_short_id(tenant_id)}:slo_violations", ttl_s=86400)
+        self.store.incr(_k("tenant", _short_id(tenant_id), "slo_violations"), ttl_s=86400)
 
     def adjust_queue(self, delta: int) -> None:
-        self.store.incr("platform:queue_depth", amount=delta, ttl_s=3600)
+        self.store.incr(_k("platform", "queue_depth"), amount=delta, ttl_s=3600)
 
     def _bucket_op(self, key: str, cap: float, now: float, cost: float) -> float:
         return self._bucket_ops([(key, cap, now, cost)])[0]

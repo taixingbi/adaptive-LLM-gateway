@@ -1,29 +1,24 @@
-"""Locust workload for the paper experiments.
-
-Hits POST /v1/infer with SigV4. Token demand is sent as metadata; the gateway
-builds the prompt so Locust does not ship 8k-token bodies on every request.
-
-  GATEWAY_URL=https://xxxx.execute-api.us-east-1.amazonaws.com \
-  PROMPT_CLASS=medium locust -f loadgen/locustfile.py --users 10 --spawn-rate 2
-"""
+"""Locust workload driven by experiments/*.yaml via EXPERIMENT_FILE."""
 
 from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 
 import boto3
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
-from locust import HttpUser, between, task
+from locust import HttpUser, task
 
-from generate_tenants import tenants as load_tenants
+from traffic import burst_multiplier
 
 ROOT = Path(__file__).resolve().parent
-PROMPT_CLASS = os.environ.get("PROMPT_CLASS", "medium")
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 _tenant_index = 0
+_PROFILES: list[dict] = []
+_SCENARIO: dict = {}
 
 
 def _load_prompt_meta() -> dict[str, dict]:
@@ -41,12 +36,26 @@ def _load_prompt_meta() -> dict[str, dict]:
     return prompts
 
 
-TENANTS = load_tenants()
+def _init_scenario() -> None:
+    global _PROFILES, _SCENARIO
+    path = os.environ.get("EXPERIMENT_FILE")
+    if path:
+        _SCENARIO = json.loads(Path(path).read_text(encoding="utf-8"))
+        _PROFILES = _SCENARIO["profiles"]
+        return
+    from generate_tenants import tenants
+    from traffic import assign_traffic
+
+    n = int(os.environ.get("TENANT_LIMIT", "100"))
+    _PROFILES = assign_traffic(tenants()[:n])
+    _SCENARIO = {"victim": None, "phases": [], "run_id": os.environ.get("RUN_ID", "local")}
+
+
+_init_scenario()
 PROMPTS = _load_prompt_meta()
 
 
 class TenantUser(HttpUser):
-    wait_time = between(0.2, 1.0)
     host = os.environ.get("GATEWAY_URL", "https://example.execute-api.us-east-1.amazonaws.com")
 
     def on_start(self) -> None:
@@ -67,18 +76,43 @@ class TenantUser(HttpUser):
         creds = session.get_credentials().get_frozen_credentials()
         self._signer = SigV4Auth(creds, "execute-api", REGION)
         self._url = f"{self.host.rstrip('/')}/v1/infer"
-        spec = PROMPTS[PROMPT_CLASS]
-        self._body = {
-            "tenant_id": TENANTS[_tenant_index % len(TENANTS)]["tenant_id"],
-            "prompt_class": PROMPT_CLASS,
-            "input_tokens": spec["input_tokens"],
-            "max_tokens": spec["max_tokens"],
-        }
+        self._profile = _PROFILES[_tenant_index % len(_PROFILES)]
         _tenant_index += 1
+
+    def wait_time(self) -> float:
+        return 60.0 / max(self._effective_rpm(), 0.05)
+
+    def _effective_rpm(self) -> float:
+        rpm = float(self._profile["rpm"])
+        victim = _SCENARIO.get("victim")
+        if victim and self._profile["tenant_id"] == victim:
+            started = getattr(self.environment.runner, "start_time", None) or time.time()
+            rpm *= burst_multiplier(time.time() - started, _SCENARIO.get("phases") or [])
+        return rpm
+
+    def _prompt_class(self) -> str:
+        forced = _SCENARIO.get("prompt_class")
+        token_phases = _SCENARIO.get("token_phases") or []
+        if token_phases:
+            started = getattr(self.environment.runner, "start_time", None) or time.time()
+            elapsed = time.time() - started
+            width = float(_SCENARIO.get("phase_duration_s") or 180)
+            idx = min(int(elapsed // width), len(token_phases) - 1)
+            return token_phases[idx]["prompt_class"]
+        return forced or self._profile["prompt_class"]
 
     @task
     def infer(self) -> None:
-        payload = json.dumps(self._body, separators=(",", ":"))
+        prompt_class = self._prompt_class()
+        spec = PROMPTS[prompt_class]
+        body = {
+            "tenant_id": self._profile["tenant_id"],
+            "prompt_class": prompt_class,
+            "input_tokens": spec["input_tokens"],
+            "max_tokens": spec["max_tokens"],
+            "run_id": _SCENARIO.get("run_id") or os.environ.get("RUN_ID", "local"),
+        }
+        payload = json.dumps(body, separators=(",", ":"))
         request = AWSRequest(
             method="POST",
             url=self._url,
@@ -86,4 +120,15 @@ class TenantUser(HttpUser):
             headers={"Content-Type": "application/json"},
         )
         self._signer.add_auth(request)
-        self.client.post("/v1/infer", data=payload, headers=dict(request.headers), name="/v1/infer")
+        with self.client.post(
+            "/v1/infer",
+            data=payload,
+            headers=dict(request.headers),
+            name="/v1/infer",
+            catch_response=True,
+        ) as response:
+            # Admission REJECT/QUEUE-full are experiment outcomes, not Locust errors.
+            if response.status_code in {200, 429, 503}:
+                response.success()
+            else:
+                response.failure(f"{response.status_code}: {response.text[:200]}")

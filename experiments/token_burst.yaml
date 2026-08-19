@@ -5,7 +5,9 @@
 name: token_burst
 scenario: S3
 backend: us.amazon.nova-micro-v1:0
+tenants: 100
 rpm: 500
+phase_duration_s: 180
 policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
 phases:
   - name: normal
@@ -17,3 +19,6 @@ phases:
     input_tokens: 5000
     max_tokens: 256
 repetitions: 5
+smoke:
+  tenants: 10
+  duration_s: 120

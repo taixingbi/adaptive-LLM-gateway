@@ -7,9 +7,12 @@ from pathlib import Path
 
 TIERS = [
     # count, tier, ttft_slo_ms, weight, tpm, rpm, concurrency
-    (10, "P1", 1000, 4, 6000, 100, 10),
-    (60, "P2", 2000, 2, 2000, 40, 4),
-    (30, "P3", 5000, 1, 1000, 20, 2),
+    # TPM limits sit above one medium/long request and, for P1, above C so a
+    # 10x noisy-neighbor burst stresses platform admission rather than the
+    # tenant cap (medium ≈ 2200 tokens; C = 100k).
+    (10, "P1", 1000, 4, 150000, 100, 10),
+    (60, "P2", 2000, 2, 20000, 40, 4),
+    (30, "P3", 5000, 1, 12000, 20, 2),
 ]
 
 # Must match gateway Settings.tenant_weight_sum. Reserved TPM = C * weight / WEIGHT_SUM.

@@ -6,6 +6,7 @@
 name: load_sweep
 scenario: S1
 backend: us.amazon.nova-micro-v1:0
+platform_tpm_budget: 100000
 tenants: 100
 prompt_class: medium
 policies: [none, rpm, tpm, token-bucket, priority, slo-aware]

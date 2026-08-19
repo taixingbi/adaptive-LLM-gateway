@@ -18,8 +18,8 @@ def load_events(path: Path) -> list[dict]:
     return events
 
 
-def summarize(events: list[dict], victim_tenants: set[str] | None = None) -> dict:
-    rows = events if not victim_tenants else [e for e in events if e.get("tenant_id") in victim_tenants]
+def summarize(events: list[dict], exclude_tenants: set[str] | None = None) -> dict:
+    rows = events if not exclude_tenants else [e for e in events if e.get("tenant_id") not in exclude_tenants]
     n = len(rows) or 1
     admitted = [e for e in rows if e.get("decision") == "ADMIT"]
     ttfts = sorted(e["ttft_ms"] for e in admitted if e.get("ttft_ms") is not None)
@@ -33,6 +33,7 @@ def summarize(events: list[dict], victim_tenants: set[str] | None = None) -> dic
         "p99_ttft_ms": _pct(ttfts, 0.99),
         "bedrock_429_rate": sum(1 for e in rows if e.get("bedrock_429")) / n,
         "bedrock_5xx_rate": sum(1 for e in rows if e.get("bedrock_5xx")) / n,
+        "throttle_rate": sum(1 for e in rows if e.get("decision") == "REJECT" or e.get("bedrock_429")) / n,
         "by_tier": _by_tier(rows),
     }
 

@@ -145,8 +145,9 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
 
     arrival_ts = time.time()
     decision, queue_ms = await _admit(tenant, estimated_tokens, arrival_ts)
+    run_id = payload.get("run_id") or settings.run_id
     event = {
-        "run_id": settings.run_id,
+        "run_id": run_id,
         "policy": policy.name,
         "tenant_id": tenant_id,
         "tier": tenant["tier"],

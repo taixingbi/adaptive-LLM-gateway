@@ -2,7 +2,7 @@
 tenants:
   - tenant_id: tenant-001
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -10,7 +10,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-002
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -18,7 +18,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-003
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -26,7 +26,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-004
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -34,7 +34,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-005
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -42,7 +42,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-006
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -50,7 +50,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-007
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -58,7 +58,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-008
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -66,7 +66,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-009
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -74,7 +74,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-010
     tier: P1
-    tpm_limit: 6000
+    tpm_limit: 150000
     rpm_limit: 100
     max_concurrency: 10
     ttft_slo_ms: 1000
@@ -82,7 +82,7 @@ tenants:
     weight: 4
   - tenant_id: tenant-011
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -90,7 +90,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-012
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -98,7 +98,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-013
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -106,7 +106,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-014
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -114,7 +114,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-015
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -122,7 +122,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-016
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -130,7 +130,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-017
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -138,7 +138,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-018
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -146,7 +146,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-019
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -154,7 +154,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-020
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -162,7 +162,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-021
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -170,7 +170,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-022
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -178,7 +178,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-023
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -186,7 +186,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-024
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -194,7 +194,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-025
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -202,7 +202,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-026
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -210,7 +210,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-027
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -218,7 +218,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-028
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -226,7 +226,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-029
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -234,7 +234,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-030
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -242,7 +242,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-031
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -250,7 +250,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-032
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -258,7 +258,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-033
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -266,7 +266,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-034
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -274,7 +274,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-035
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -282,7 +282,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-036
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -290,7 +290,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-037
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -298,7 +298,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-038
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -306,7 +306,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-039
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -314,7 +314,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-040
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -322,7 +322,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-041
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -330,7 +330,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-042
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -338,7 +338,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-043
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -346,7 +346,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-044
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -354,7 +354,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-045
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -362,7 +362,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-046
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -370,7 +370,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-047
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -378,7 +378,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-048
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -386,7 +386,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-049
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -394,7 +394,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-050
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -402,7 +402,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-051
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -410,7 +410,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-052
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -418,7 +418,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-053
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -426,7 +426,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-054
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -434,7 +434,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-055
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -442,7 +442,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-056
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -450,7 +450,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-057
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -458,7 +458,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-058
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -466,7 +466,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-059
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -474,7 +474,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-060
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -482,7 +482,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-061
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -490,7 +490,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-062
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -498,7 +498,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-063
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -506,7 +506,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-064
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -514,7 +514,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-065
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -522,7 +522,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-066
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -530,7 +530,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-067
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -538,7 +538,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-068
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -546,7 +546,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-069
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -554,7 +554,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-070
     tier: P2
-    tpm_limit: 2000
+    tpm_limit: 20000
     rpm_limit: 40
     max_concurrency: 4
     ttft_slo_ms: 2000
@@ -562,7 +562,7 @@ tenants:
     weight: 2
   - tenant_id: tenant-071
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -570,7 +570,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-072
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -578,7 +578,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-073
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -586,7 +586,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-074
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -594,7 +594,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-075
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -602,7 +602,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-076
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -610,7 +610,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-077
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -618,7 +618,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-078
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -626,7 +626,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-079
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -634,7 +634,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-080
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -642,7 +642,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-081
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -650,7 +650,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-082
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -658,7 +658,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-083
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -666,7 +666,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-084
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -674,7 +674,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-085
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -682,7 +682,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-086
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -690,7 +690,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-087
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -698,7 +698,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-088
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -706,7 +706,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-089
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -714,7 +714,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-090
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -722,7 +722,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-091
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -730,7 +730,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-092
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -738,7 +738,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-093
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -746,7 +746,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-094
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -754,7 +754,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-095
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -762,7 +762,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-096
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -770,7 +770,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-097
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -778,7 +778,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-098
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -786,7 +786,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-099
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
@@ -794,7 +794,7 @@ tenants:
     weight: 1
   - tenant_id: tenant-100
     tier: P3
-    tpm_limit: 1000
+    tpm_limit: 12000
     rpm_limit: 20
     max_concurrency: 2
     ttft_slo_ms: 5000
