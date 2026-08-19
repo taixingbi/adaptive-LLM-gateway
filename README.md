@@ -146,6 +146,9 @@ LOADGEN_ROLE_ARN=$(terraform -chdir=terraform/envs/dev output -json sample_role_
 
 # Plots from gateway events (source of truth)
 python3 analysis/plots.py /path/to/downloaded/jsonl
+
+# Simple policy-level view from analysis/archive/*/summary.json
+python3 analysis/visualize.py --scenario noisy_neighbor --title "Noisy neighbor policy comparison"
 ```
 
 Download JSONL from the results bucket before plotting (`plots.py` reads a local directory of `.jsonl` files).

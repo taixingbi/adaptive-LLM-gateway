@@ -16,7 +16,7 @@ from metrics import load_events, summarize
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("results_dir", type=Path)
-    parser.add_argument("--out", type=Path, default=Path("analysis/out"))
+    parser.add_argument("--out", type=Path, default=Path("analysis/result_paper"))
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
