@@ -1,0 +1,28 @@
+{
+  "requests": 439,
+  "admit_rate": 0.8451025056947609,
+  "reject_rate": 0.1548974943052392,
+  "slo_attainment": 0.9757412398921833,
+  "p50_ttft_ms": 295.93801498413086,
+  "p99_ttft_ms": 416.5802001953125,
+  "bedrock_429_rate": 0.0,
+  "bedrock_5xx_rate": 0.0,
+  "throttle_rate": 0.1548974943052392,
+  "by_tier": {
+    "P1": {
+      "n": 26,
+      "slo_attainment": 1.0,
+      "admit_rate": 1.0
+    },
+    "P2": {
+      "n": 361,
+      "slo_attainment": 0.971875,
+      "admit_rate": 0.8864265927977839
+    },
+    "P3": {
+      "n": 52,
+      "slo_attainment": 1.0,
+      "admit_rate": 0.4807692307692308
+    }
+  }
+}
