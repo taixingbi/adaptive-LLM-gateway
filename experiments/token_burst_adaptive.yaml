@@ -1,0 +1,23 @@
+# Adaptive validation — token burst (main result).
+# Compare adaptive-slo vs existing static slo-aware baselines (do not re-run static).
+
+name: token_burst
+scenario: S3
+backend: us.amazon.nova-micro-v1:0
+tenants: 100
+rpm: 500
+phase_duration_s: 180
+policies: [adaptive-slo]
+phases:
+  - name: normal
+    prompt_class: short
+    input_tokens: 500
+    max_tokens: 64
+  - name: burst
+    prompt_class: long
+    input_tokens: 5000
+    max_tokens: 256
+repetitions: 5
+smoke:
+  tenants: 10
+  duration_s: 120

@@ -91,7 +91,8 @@ chmod +x scripts/invoke.sh scripts/infer.sh
 | `tpm` / `tpm-fixed` | Calendar-minute token window (resets at `HH:MM`) |
 | `token-bucket` | Stronger TPM baseline: continuous refill, no minute-boundary reset |
 | `priority` | Weighted / tier-aware under pressure |
-| `slo-aware` | Paper controller |
+| `slo-aware` | Paper controller (static synthetic C) |
+| `adaptive-slo` | AIMD-adapted C_hat + same SLO band logic |
 
 `slo-aware` slack is `TTFT_SLO − wait − estimated backend TTFT`. Capacity bands:
 
