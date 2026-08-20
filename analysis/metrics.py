@@ -35,8 +35,10 @@ def summarize(events: list[dict], exclude_tenants: set[str] | None = None) -> di
         # Backward-compatibility alias. This is SLO among admitted requests.
         "slo_attainment": conditional_slo,
         "conditional_slo_attainment": conditional_slo,
+        "effective_slo_goodput": slo_goodput,
         "slo_goodput": slo_goodput,
         "p50_ttft_ms": _pct(ttfts, 0.50),
+        "p95_ttft_ms": _pct(ttfts, 0.95),
         "p99_ttft_ms": _pct(ttfts, 0.99),
         "bedrock_429_rate": sum(1 for e in rows if e.get("bedrock_429")) / n,
         "bedrock_5xx_rate": sum(1 for e in rows if e.get("bedrock_5xx")) / n,
@@ -59,6 +61,7 @@ def summarize_simple(rows: list[dict]) -> dict:
         "n": len(rows),
         "slo_attainment": admitted_slo_n / max(len(admitted), 1),
         "conditional_slo_attainment": admitted_slo_n / max(len(admitted), 1),
+        "effective_slo_goodput": admitted_slo_n / max(len(rows), 1),
         "slo_goodput": admitted_slo_n / max(len(rows), 1),
         "admit_rate": len(admitted) / max(len(rows), 1),
     }

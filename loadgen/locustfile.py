@@ -10,15 +10,28 @@ from pathlib import Path
 import boto3
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
-from locust import HttpUser, task
+from locust import HttpUser, events, task
 
 from traffic import burst_multiplier
 
 ROOT = Path(__file__).resolve().parent
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 _tenant_index = 0
+_TEST_START: float | None = None
 _PROFILES: list[dict] = []
 _SCENARIO: dict = {}
+
+
+@events.test_start.add_listener
+def _on_test_start(environment, **kwargs) -> None:
+    global _TEST_START
+    _TEST_START = time.time()
+
+
+def _elapsed_s() -> float:
+    if _TEST_START is None:
+        return 0.0
+    return time.time() - _TEST_START
 
 
 def _load_prompt_meta() -> dict[str, dict]:
@@ -86,25 +99,34 @@ class TenantUser(HttpUser):
         rpm = float(self._profile["rpm"])
         victim = _SCENARIO.get("victim")
         if victim and self._profile["tenant_id"] == victim:
-            started = getattr(self.environment.runner, "start_time", None) or time.time()
-            rpm *= burst_multiplier(time.time() - started, _SCENARIO.get("phases") or [])
+            rpm *= burst_multiplier(_elapsed_s(), _SCENARIO.get("phases") or [])
         return rpm
 
-    def _prompt_class(self) -> str:
-        forced = _SCENARIO.get("prompt_class")
+    def _prompt_phase(self) -> dict | None:
         token_phases = _SCENARIO.get("token_phases") or []
-        if token_phases:
-            started = getattr(self.environment.runner, "start_time", None) or time.time()
-            elapsed = time.time() - started
-            width = float(_SCENARIO.get("phase_duration_s") or 180)
-            idx = min(int(elapsed // width), len(token_phases) - 1)
-            return token_phases[idx]["prompt_class"]
+        if not token_phases:
+            return None
+        width = float(_SCENARIO.get("phase_duration_s") or 180)
+        idx = min(int(_elapsed_s() // width), len(token_phases) - 1)
+        return token_phases[idx]
+
+    def _prompt_class(self) -> str:
+        phase = self._prompt_phase()
+        if phase:
+            return phase["prompt_class"]
+        forced = _SCENARIO.get("prompt_class")
         return forced or self._profile["prompt_class"]
 
     @task
     def infer(self) -> None:
-        prompt_class = self._prompt_class()
-        spec = PROMPTS[prompt_class]
+        phase = self._prompt_phase()
+        prompt_class = phase["prompt_class"] if phase else self._prompt_class()
+        spec = dict(PROMPTS[prompt_class])
+        if phase:
+            if phase.get("input_tokens") is not None:
+                spec["input_tokens"] = int(phase["input_tokens"])
+            if phase.get("max_tokens") is not None:
+                spec["max_tokens"] = int(phase["max_tokens"])
         body = {
             "tenant_id": self._profile["tenant_id"],
             "prompt_class": prompt_class,

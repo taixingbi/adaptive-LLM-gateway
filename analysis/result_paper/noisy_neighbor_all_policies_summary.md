@@ -2,7 +2,7 @@
 
 Selection rule: latest run per `(policy, repetition)` for `r1..r5` (based on timestamp in run folder name).
 
-| Policy | Reps | Admit rate | Conditional SLO | SLO Goodput | P99 TTFT (ms) | Throttle rate |
+| Policy | Reps | Admit rate | Conditional SLO | Effective SLO Goodput | P99 TTFT (ms) | Throttle rate |
 |---|---:|---:|---:|---:|---:|---:|
 | `none` | 5 | 1.000 | 0.999 | 0.999 | 562.0 | 0.000 |
 | `priority` | 5 | 0.837 | 0.996 | 0.833 | 397.0 | 0.163 |
