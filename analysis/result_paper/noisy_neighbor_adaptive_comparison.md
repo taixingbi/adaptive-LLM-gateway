@@ -43,3 +43,13 @@ Metrics exclude victim `tenant-007`. Selection: latest `r1..r5` per policy.
 - Does non-offender P99 stay close to static, or does admit≈1 inflate tails?
 - Is goodput gain worth isolation loss?
 
+## Finding (honest)
+
+Adaptive recovers near-100% non-victim goodput (0.997 vs static 0.847) by essentially stopping shedding (throttle 0 vs 0.13). That comes with a clear isolation / tail cost:
+
+- Non-victim P99 rises from ~394 ms (static) to ~624 ms (adaptive).
+- P1 P99 is especially hurt (~1811 ms vs ~353 ms) even though P1 admit stays 100%.
+- P3 goes from heavily shed under static (admit 0.485) to fully admitted under adaptive — goodput win, weaker noisy-neighbor isolation.
+
+Paper framing: Adaptive is valuable on token-burst elastic capacity; on noisy-neighbor it trades static’s latency protection for higher goodput and weaker tenant isolation. A production controller likely needs a floor on shedding / per-tenant caps so AIMD cannot fully disable isolation.
+
