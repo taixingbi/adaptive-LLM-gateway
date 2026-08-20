@@ -43,11 +43,28 @@ jobs:
           aws-region: ${{ steps.tfvars.outputs.region }}
           audience: sts.amazonaws.com
 
+      # Preserve live experiment knobs. Laptop `run_experiment.py --deploy` sets
+      # admission_policy/run_id via -var; a naive apply from tfvars (defaults to
+      # none/dev) was clobbering mid-run adaptive-slo experiments.
       - name: Terraform apply
         working-directory: terraform/envs/dev
+        env:
+          REGION: ${{ steps.tfvars.outputs.region }}
         run: |
           terraform init -input=false
-          terraform apply -input=false -auto-approve
+          TD=$(aws ecs describe-services --cluster bedrock-platform-dev-llm --services llm-gateway --region "$REGION" --query 'services[0].taskDefinition' --output text 2>/dev/null || true)
+          POLICY=$(grep -E '^admission_policy' terraform.tfvars | awk -F'"' '{print $2}')
+          RUN_ID=$(grep -E '^run_id' terraform.tfvars | awk -F'"' '{print $2}')
+          if [ -n "$TD" ] && [ "$TD" != "None" ]; then
+            LIVE_POLICY=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`ADMISSION_POLICY`].value' --output text)
+            LIVE_RUN=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`RUN_ID`].value' --output text)
+            [ -n "$LIVE_POLICY" ] && [ "$LIVE_POLICY" != "None" ] && POLICY="$LIVE_POLICY"
+            [ -n "$LIVE_RUN" ] && [ "$LIVE_RUN" != "None" ] && RUN_ID="$LIVE_RUN"
+          fi
+          echo "Preserving admission_policy=$POLICY run_id=$RUN_ID"
+          terraform apply -input=false -auto-approve \
+            -var="admission_policy=${POLICY}" \
+            -var="run_id=${RUN_ID}"
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
