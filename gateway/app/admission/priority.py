@@ -5,8 +5,7 @@ class PriorityPolicy:
     name = "priority"
 
     def decide(self, ctx: RequestContext) -> Decision:
-        tenant_next = ctx.tenant_tpm_used + ctx.estimated_tokens
-        if tenant_next > ctx.tenant_tpm_limit:
+        if ctx.tenant_tpm_exceeded():
             return Decision(action="QUEUE", reason="tenant-tpm-exceeded")
         pressure = ctx.platform_pressure
         if pressure < 0.95:

@@ -57,9 +57,9 @@ s3 = session.client("s3")
 results = ResultWriter(s3, settings.results_bucket, settings.run_id)
 
 PROMPT_CLASSES = {
-    "short": {"input_tokens": 250, "max_tokens": 64},
-    "medium": {"input_tokens": 2000, "max_tokens": 256},
-    "long": {"input_tokens": 8000, "max_tokens": 1024},
+    "short": {"input_tokens": 284, "max_tokens": 64},
+    "medium": {"input_tokens": 1942, "max_tokens": 256},
+    "long": {"input_tokens": 8217, "max_tokens": 1024},
 }
 
 
@@ -71,9 +71,7 @@ def health() -> dict[str, str]:
         "platform_tpm_budget": str(settings.platform_tpm_budget),
     }
     if adaptive is not None:
-        snap = adaptive.snapshot()
-        payload["adaptive_capacity"] = str(snap.capacity)
-        payload["adaptive_last_action"] = snap.last_action
+        _attach_adaptive(payload, stringify=True)
     return payload
 
 
@@ -186,10 +184,7 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
         "bedrock_5xx": False,
         "platform_tpm_budget": platform_budget,
     }
-    if adaptive is not None:
-        snap = adaptive.snapshot()
-        event["adaptive_capacity"] = snap.capacity
-        event["adaptive_last_action"] = snap.last_action
+    _attach_adaptive(event)
 
     if decision.action != "ADMIT":
         counters.record_reject(tenant_id)
@@ -245,9 +240,7 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
             bedrock_429=bool(stream.bedrock_429),
             ttft_ms=stream.ttft_ms,
         )
-        snap = adaptive.snapshot()
-        event["adaptive_capacity"] = snap.capacity
-        event["adaptive_last_action"] = snap.last_action
+        _attach_adaptive(event)
     results.write(event)
 
     status_code = 200
@@ -317,6 +310,14 @@ def _default_prompt(prompt_class: str) -> str:
     seed = "Summarize the following enterprise operations note in one sentence. "
     repeats = {"short": 8, "medium": 70, "long": 280}.get(prompt_class, 70)
     return seed + ("The queue depth is rising and latency SLOs are at risk. " * repeats)
+
+
+def _attach_adaptive(target: dict[str, Any], *, stringify: bool = False) -> None:
+    if adaptive is None:
+        return
+    snap = adaptive.snapshot()
+    target["adaptive_capacity"] = str(snap.capacity) if stringify else snap.capacity
+    target["adaptive_last_action"] = snap.last_action
 
 
 def _jsonable(value: Any) -> Any:

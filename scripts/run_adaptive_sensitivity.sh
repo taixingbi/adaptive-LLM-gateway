@@ -11,7 +11,7 @@ mkdir -p analysis/out/logs
 echo "$LOG" > analysis/out/logs/adaptive_sensitivity.latest
 exec > >(tee -a "$LOG") 2>&1
 
-YAML=experiments/token_burst_adaptive.yaml
+YAML=experiments/token_burst.yaml
 PY=.venv/bin/python
 
 run_one() {

@@ -4,16 +4,20 @@
 from __future__ import annotations
 
 import argparse
-import json
-import re
 import sys
 from pathlib import Path
-from statistics import mean, pstdev
-
-import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent))
-from metrics import load_events, summarize
+from metrics import load_events, summarize  # noqa: E402
+from runs import (  # noqa: E402
+    aggregate,
+    load_summary_runs,
+    plot_triple,
+    policy_csv_columns,
+    select_latest,
+    write_csv,
+    write_selected_runs_md,
+)
 
 
 def main() -> None:
@@ -28,15 +32,15 @@ def main() -> None:
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
-    selected = _select_latest(_load_runs(args.input, args.scenario), args.rep_min, args.rep_max)
+    selected = select_latest(load_summary_runs(args.input, args.scenario), ("policy", "rep"), args.rep_min, args.rep_max)
     if not selected:
         raise SystemExit(f"no runs found for scenario={args.scenario} in {args.input}")
 
-    full_stats = _aggregate_full(selected)
+    full_stats = aggregate(selected, "policy")
     burst_stats = _aggregate_burst(selected, args.burst_start_s, args.burst_end_s)
-
     stem = args.scenario
-    _write_csv(args.out / f"{stem}_policy_summary.csv", full_stats)
+    columns = policy_csv_columns(include_p95=True)
+    write_csv(args.out / f"{stem}_policy_summary.csv", full_stats, columns)
     _write_md(
         args.out / f"{stem}_all_policies_summary.md",
         full_stats,
@@ -54,109 +58,27 @@ def main() -> None:
         title="Token Burst Burst-Phase Summary (seconds 180–360)",
         burst_window=(args.burst_start_s, args.burst_end_s),
     )
-    _plot(args.out / f"{stem}_policy_summary.png", burst_stats, "Token burst (burst phase)")
+    plot_triple(
+        args.out / f"{stem}_policy_summary.png",
+        [r["policy"] for r in burst_stats],
+        goodput=[r["effective_slo_goodput_mean"] or 0 for r in burst_stats],
+        p99=[r["p99_ttft_ms_mean"] or 0 for r in burst_stats],
+        throttle=[r["throttle_rate_mean"] or 0 for r in burst_stats],
+        title="Token burst (burst phase)",
+    )
     print(f"wrote {args.out / f'{stem}_policy_summary.png'}")
 
 
-def _load_runs(root: Path, scenario: str) -> list[dict]:
-    pattern = re.compile(rf"{re.escape(scenario)}-([a-z\-]+)-r(\d+)-")
-    rows: list[dict] = []
-    for file in root.glob(f"{scenario}-*/summary.json"):
-        match = pattern.match(file.parent.name)
-        if not match:
-            continue
-        rows.append(
-            {
-                "policy": match.group(1),
-                "rep": int(match.group(2)),
-                "run": file.parent.name,
-                "run_dir": file.parent,
-                "summary": json.loads(file.read_text(encoding="utf-8")),
-            }
-        )
-    return rows
-
-
-def _select_latest(rows: list[dict], rep_min: int, rep_max: int) -> list[dict]:
-    latest: dict[tuple[str, int], dict] = {}
-    for row in rows:
-        if row["rep"] < rep_min or row["rep"] > rep_max:
-            continue
-        key = (row["policy"], row["rep"])
-        prev = latest.get(key)
-        if prev is None or row["run"] > prev["run"]:
-            latest[key] = row
-    return sorted(latest.values(), key=lambda r: (r["policy"], r["rep"]))
-
-
-def _aggregate_full(rows: list[dict]) -> list[dict]:
-    by_policy: dict[str, list[dict]] = {}
-    for row in rows:
-        by_policy.setdefault(row["policy"], []).append(row["summary"])
-    return [_stats(policy, vals) for policy, vals in sorted(by_policy.items())]
-
-
 def _aggregate_burst(rows: list[dict], start_s: int, end_s: int) -> list[dict]:
-    by_policy: dict[str, list[dict]] = {}
+    burst_rows: list[dict] = []
     for row in rows:
         events = load_events(row["run_dir"])
         if not events:
             continue
         t0 = min(e["arrival_ts"] for e in events)
         burst = [e for e in events if start_s <= e["arrival_ts"] - t0 < end_s]
-        by_policy.setdefault(row["policy"], []).append(summarize(burst))
-    return [_stats(policy, vals) for policy, vals in sorted(by_policy.items())]
-
-
-def _stats(policy: str, vals: list[dict]) -> dict:
-    cond = [v.get("conditional_slo_attainment", v.get("slo_attainment")) for v in vals]
-    goodput = [
-        v.get("effective_slo_goodput", v.get("slo_goodput", v.get("admit_rate", 0.0) * v.get("slo_attainment", 0.0)))
-        for v in vals
-    ]
-    admit = [v["admit_rate"] for v in vals]
-    throttle = [v["throttle_rate"] for v in vals]
-    p99 = [v["p99_ttft_ms"] for v in vals if v.get("p99_ttft_ms") is not None]
-    p95 = [v["p95_ttft_ms"] for v in vals if v.get("p95_ttft_ms") is not None]
-    return {
-        "policy": policy,
-        "repetitions": len(vals),
-        "admit_rate_mean": mean(admit),
-        "admit_rate_std": pstdev(admit) if len(admit) > 1 else 0.0,
-        "conditional_slo_attainment_mean": mean(cond),
-        "conditional_slo_attainment_std": pstdev(cond) if len(cond) > 1 else 0.0,
-        "effective_slo_goodput_mean": mean(goodput),
-        "effective_slo_goodput_std": pstdev(goodput) if len(goodput) > 1 else 0.0,
-        "p95_ttft_ms_mean": mean(p95) if p95 else None,
-        "p95_ttft_ms_std": pstdev(p95) if len(p95) > 1 else 0.0,
-        "p99_ttft_ms_mean": mean(p99) if p99 else None,
-        "p99_ttft_ms_std": pstdev(p99) if len(p99) > 1 else 0.0,
-        "throttle_rate_mean": mean(throttle),
-        "throttle_rate_std": pstdev(throttle) if len(throttle) > 1 else 0.0,
-    }
-
-
-def _write_csv(path: Path, rows: list[dict]) -> None:
-    header = [
-        "policy",
-        "repetitions",
-        "admit_rate_mean",
-        "admit_rate_std",
-        "conditional_slo_attainment_mean",
-        "conditional_slo_attainment_std",
-        "effective_slo_goodput_mean",
-        "effective_slo_goodput_std",
-        "p95_ttft_ms_mean",
-        "p95_ttft_ms_std",
-        "p99_ttft_ms_mean",
-        "p99_ttft_ms_std",
-        "throttle_rate_mean",
-        "throttle_rate_std",
-    ]
-    lines = [",".join(header)]
-    for row in rows:
-        lines.append(",".join(str(row[h]) for h in header))
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        burst_rows.append({**row, "summary": summarize(burst)})
+    return aggregate(burst_rows, "policy")
 
 
 def _write_md(
@@ -169,10 +91,6 @@ def _write_md(
     title: str,
     burst_window: tuple[int, int] | None = None,
 ) -> None:
-    by_policy: dict[str, list[dict]] = {}
-    for row in selected:
-        by_policy.setdefault(row["policy"], []).append(row)
-
     lines = [f"# {title}", ""]
     if burst_window:
         lines.append(f"Burst window: `{burst_window[0]}s..{burst_window[1]}s` from run start.")
@@ -190,34 +108,8 @@ def _write_md(
             f"{row['conditional_slo_attainment_mean']:.3f} | {row['effective_slo_goodput_mean']:.3f} | "
             f"{(row['p95_ttft_ms_mean'] or 0):.1f} | {(row['p99_ttft_ms_mean'] or 0):.1f} | {row['throttle_rate_mean']:.3f} |"
         )
-    lines.extend(["", "## Selected runs", ""])
-    for policy in sorted(by_policy):
-        ordered = sorted(by_policy[policy], key=lambda r: r["rep"])
-        parts = [f"r{r['rep']}: {r['run']}" for r in ordered]
-        lines.append(f"- `{policy}`: " + "; ".join(parts))
+    write_selected_runs_md(lines, selected, "policy")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def _plot(path: Path, rows: list[dict], title: str) -> None:
-    names = [r["policy"] for r in rows]
-    goodput = [100 * r["effective_slo_goodput_mean"] for r in rows]
-    p99 = [r["p99_ttft_ms_mean"] or 0 for r in rows]
-    throttle = [100 * r["throttle_rate_mean"] for r in rows]
-
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-    fig.suptitle(title)
-    axes[0].bar(names, goodput, capsize=3)
-    axes[0].set_ylabel("Effective SLO goodput (%)")
-    axes[0].set_ylim(0, 100)
-    axes[0].tick_params(axis="x", rotation=30)
-    axes[1].bar(names, p99, capsize=3)
-    axes[1].set_ylabel("P99 TTFT (ms)")
-    axes[1].tick_params(axis="x", rotation=30)
-    axes[2].bar(names, throttle, capsize=3)
-    axes[2].set_ylabel("Throttle rate (%)")
-    axes[2].tick_params(axis="x", rotation=30)
-    fig.tight_layout()
-    fig.savefig(path, dpi=160)
 
 
 if __name__ == "__main__":

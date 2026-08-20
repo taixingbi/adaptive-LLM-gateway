@@ -20,8 +20,7 @@ class SloAwarePolicy:
     slack_threshold_ms = 200.0
 
     def decide(self, ctx: RequestContext) -> Decision:
-        tenant_next = ctx.tenant_tpm_used + ctx.estimated_tokens
-        if tenant_next > ctx.tenant_tpm_limit:
+        if ctx.tenant_tpm_exceeded():
             return Decision(action="QUEUE", reason="tenant-over-quota")
         if ctx.tenant_concurrency >= ctx.tenant_max_concurrency:
             return Decision(action="QUEUE", reason="tenant-concurrency")

@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import boto3
+import yaml
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from locust import HttpUser, events, task
@@ -34,18 +35,13 @@ def _elapsed_s() -> float:
     return time.time() - _TEST_START
 
 
-def _load_prompt_meta() -> dict[str, dict]:
+def _load_prompts() -> dict[str, dict]:
+    raw = yaml.safe_load((ROOT / "prompts" / "manifest.yaml").read_text(encoding="utf-8"))
     prompts: dict[str, dict] = {}
-    name = None
-    for raw in (ROOT / "prompts" / "manifest.yaml").read_text(encoding="utf-8").splitlines():
-        if raw.startswith("  ") and not raw.startswith("    ") and raw.strip().endswith(":"):
-            name = raw.strip()[:-1]
-            prompts[name] = {}
-        elif name and ":" in raw:
-            key, value = raw.strip().split(":", 1)
-            value = value.strip()
-            if key != "path":
-                prompts[name][key] = int(value) if value.isdigit() else value
+    for name, spec in (raw.get("prompts") or {}).items():
+        entry = dict(spec)
+        entry["text"] = (ROOT / "prompts" / spec["path"]).read_text(encoding="utf-8")
+        prompts[name] = entry
     return prompts
 
 
@@ -65,7 +61,7 @@ def _init_scenario() -> None:
 
 
 _init_scenario()
-PROMPTS = _load_prompt_meta()
+PROMPTS = _load_prompts()
 
 
 class TenantUser(HttpUser):
@@ -119,9 +115,9 @@ class TenantUser(HttpUser):
 
     @task
     def infer(self) -> None:
-        phase = self._prompt_phase()
-        prompt_class = phase["prompt_class"] if phase else self._prompt_class()
+        prompt_class = self._prompt_class()
         spec = dict(PROMPTS[prompt_class])
+        phase = self._prompt_phase()
         if phase:
             if phase.get("input_tokens") is not None:
                 spec["input_tokens"] = int(phase["input_tokens"])
@@ -130,6 +126,7 @@ class TenantUser(HttpUser):
         body = {
             "tenant_id": self._profile["tenant_id"],
             "prompt_class": prompt_class,
+            "prompt": spec["text"],
             "input_tokens": spec["input_tokens"],
             "max_tokens": spec["max_tokens"],
             "run_id": _SCENARIO.get("run_id") or os.environ.get("RUN_ID", "local"),

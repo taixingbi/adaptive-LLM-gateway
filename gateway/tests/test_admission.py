@@ -1,43 +1,22 @@
-from app.admission.base import RequestContext, get_policy
-
-
-def _ctx(**overrides) -> RequestContext:
-    base = dict(
-        tenant_id="tenant-007",
-        tier="P2",
-        weight=2,
-        estimated_tokens=500,
-        wait_ms=0,
-        ttft_slo_ms=2000,
-        estimated_backend_ttft_ms=400,
-        tenant_tpm_used=0,
-        tenant_tpm_limit=10000,
-        tenant_rpm_used=0,
-        tenant_rpm_limit=100,
-        tenant_concurrency=0,
-        tenant_max_concurrency=10,
-        platform_tpm_used=0,
-        platform_tpm_budget=100000,
-    )
-    base.update(overrides)
-    return RequestContext(**base)
+from app.admission.base import get_policy
+from tests.helpers import ctx
 
 
 def test_none_always_admits() -> None:
-    decision = get_policy("none").decide(_ctx(tenant_rpm_used=10_000, platform_tpm_used=10**9))
+    decision = get_policy("none").decide(ctx(tenant_rpm_used=10_000, platform_tpm_used=10**9))
     assert decision.action == "ADMIT"
 
 
 def test_rpm_rejects_over_limit() -> None:
     policy = get_policy("rpm")
-    assert policy.decide(_ctx(tenant_rpm_used=99)).action == "ADMIT"
-    assert policy.decide(_ctx(tenant_rpm_used=100)).action == "REJECT"
+    assert policy.decide(ctx(tenant_rpm_used=99)).action == "ADMIT"
+    assert policy.decide(ctx(tenant_rpm_used=100)).action == "REJECT"
 
 
 def test_tpm_queues_when_request_would_exceed_quota() -> None:
     policy = get_policy("tpm")
-    admit = policy.decide(_ctx(tenant_tpm_used=8000, estimated_tokens=500))
-    queue = policy.decide(_ctx(tenant_tpm_used=8000, estimated_tokens=4000))
+    admit = policy.decide(ctx(tenant_tpm_used=8000, estimated_tokens=500))
+    queue = policy.decide(ctx(tenant_tpm_used=8000, estimated_tokens=4000))
     assert admit.action == "ADMIT"
     assert queue.action == "QUEUE"
     assert queue.reason == "tenant-tpm-exceeded"
@@ -45,8 +24,8 @@ def test_tpm_queues_when_request_would_exceed_quota() -> None:
 
 def test_priority_protects_p1_under_pressure() -> None:
     policy = get_policy("priority")
-    p1 = policy.decide(_ctx(tier="P1", platform_tpm_used=96000))
-    p3 = policy.decide(_ctx(tier="P3", platform_tpm_used=96000))
+    p1 = policy.decide(ctx(tier="P1", platform_tpm_used=96000))
+    p3 = policy.decide(ctx(tier="P3", platform_tpm_used=96000))
     assert p1.action == "ADMIT"
     assert p3.action == "REJECT"
 
@@ -54,7 +33,7 @@ def test_priority_protects_p1_under_pressure() -> None:
 def test_slo_aware_admits_tight_slack() -> None:
     policy = get_policy("slo-aware")
     tight = policy.decide(
-        _ctx(
+        ctx(
             tier="P2",
             platform_tpm_used=90000,
             wait_ms=1500,
@@ -63,7 +42,7 @@ def test_slo_aware_admits_tight_slack() -> None:
         )
     )
     slack = policy.decide(
-        _ctx(
+        ctx(
             tier="P2",
             platform_tpm_used=90000,
             wait_ms=100,
@@ -76,7 +55,7 @@ def test_slo_aware_admits_tight_slack() -> None:
 
 
 def test_slo_aware_low_pressure_admits() -> None:
-    decision = get_policy("slo-aware").decide(_ctx(platform_tpm_used=10000))
+    decision = get_policy("slo-aware").decide(ctx(platform_tpm_used=10000))
     assert decision.action == "ADMIT"
     assert decision.reason == "slo-low-pressure"
 
@@ -84,7 +63,7 @@ def test_slo_aware_low_pressure_admits() -> None:
 def test_slo_aware_p1_does_not_break_hard_ceiling() -> None:
     policy = get_policy("slo-aware")
     over_reserved = policy.decide(
-        _ctx(
+        ctx(
             tier="P1",
             weight=4,
             platform_tpm_used=105000,
@@ -92,9 +71,9 @@ def test_slo_aware_p1_does_not_break_hard_ceiling() -> None:
             estimated_tokens=500,
         )
     )
-    hard = policy.decide(_ctx(tier="P1", platform_tpm_used=110000))
+    hard = policy.decide(ctx(tier="P1", platform_tpm_used=110000))
     reserved = policy.decide(
-        _ctx(
+        ctx(
             tier="P1",
             weight=4,
             platform_tpm_used=105000,
@@ -113,7 +92,7 @@ def test_slo_aware_p1_does_not_break_hard_ceiling() -> None:
 def test_slo_aware_reserved_admits_request_larger_than_fair_share() -> None:
     """P1 reserved share is ~2105 TPM at C=100k; a medium request is ~2200."""
     decision = get_policy("slo-aware").decide(
-        _ctx(
+        ctx(
             tier="P1",
             weight=4,
             platform_tpm_used=105000,
@@ -127,8 +106,8 @@ def test_slo_aware_reserved_admits_request_larger_than_fair_share() -> None:
 
 def test_token_bucket_queues_when_empty() -> None:
     policy = get_policy("token-bucket")
-    ok = policy.decide(_ctx(tenant_bucket_tokens=800, platform_bucket_tokens=5000, estimated_tokens=500))
-    empty = policy.decide(_ctx(tenant_bucket_tokens=100, platform_bucket_tokens=5000, estimated_tokens=500))
+    ok = policy.decide(ctx(tenant_bucket_tokens=800, platform_bucket_tokens=5000, estimated_tokens=500))
+    empty = policy.decide(ctx(tenant_bucket_tokens=100, platform_bucket_tokens=5000, estimated_tokens=500))
     assert ok.action == "ADMIT"
     assert empty.action == "QUEUE"
     assert get_policy("tpm-fixed").name == "tpm"

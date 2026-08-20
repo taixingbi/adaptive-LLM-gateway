@@ -1,5 +1,5 @@
 from generate_tenants import tenants
-from traffic import PLATFORM_TPM_BUDGET, assign_traffic, burst_multiplier, offered_tpm, scale_to_budget
+from traffic import PLATFORM_TPM_BUDGET, PROMPT_TOKENS, assign_traffic, burst_multiplier, offered_tpm, scale_to_budget
 
 
 def test_skew_on_100_tenants() -> None:
@@ -40,6 +40,12 @@ def test_tenant_tpm_fits_a_medium_request() -> None:
     assert by_tier["P1"] > PLATFORM_TPM_BUDGET
     assert by_tier["P2"] > medium
     assert by_tier["P3"] > medium
+
+
+def test_prompt_tokens_match_manifest() -> None:
+    assert PROMPT_TOKENS["short"] == 284 + 64
+    assert PROMPT_TOKENS["medium"] == 1942 + 256
+    assert PROMPT_TOKENS["long"] == 8217 + 1024
 
 
 def test_scale_to_budget_hits_platform_c() -> None:

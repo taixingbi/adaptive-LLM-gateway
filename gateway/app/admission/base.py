@@ -41,6 +41,9 @@ class RequestContext:
             return 0.0
         return self.platform_tpm_budget * self.weight / self.weight_sum
 
+    def tenant_tpm_exceeded(self) -> bool:
+        return self.tenant_tpm_used + self.estimated_tokens > self.tenant_tpm_limit
+
 
 @dataclass
 class Decision:

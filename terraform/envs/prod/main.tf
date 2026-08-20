@@ -35,7 +35,7 @@ variable "github_org" {
 }
 variable "github_repo" {
   type    = string
-  default = "bedrock-platform"
+  default = "adaptive-LLM-gateway"
 }
 variable "desired_count" {
   type    = number

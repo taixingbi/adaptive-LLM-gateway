@@ -2,12 +2,9 @@ from __future__ import annotations
 
 import threading
 import time
-from datetime import datetime, timezone
 from typing import Protocol
 
-
-def minute_key() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
+from app.rate_limit import minute_window
 
 
 def _short_id(tenant_id: str) -> str:
@@ -25,6 +22,8 @@ class CounterStore(Protocol):
     def incr(self, key: str, amount: int = 1, ttl_s: int = 120) -> int: ...
     def incrby(self, key: str, amount: int, ttl_s: int = 120) -> int: ...
     def incr_many(self, ops: list[tuple[str, int, int]]) -> None: ...
+    def get_raw(self, key: str) -> str | None: ...
+    def set_raw(self, key: str, value: str, ttl_s: int = 120) -> None: ...
 
 
 class MemoryCounters:
@@ -180,7 +179,7 @@ class QuotaCounters:
         platform_tpm_budget: int = 0,
         use_buckets: bool = True,
     ) -> dict[str, int | float]:
-        window = minute_key()
+        window = minute_window()
         short = _short_id(tenant_id)
         keys = [
             _k("platform", "tpm", window),
@@ -221,7 +220,7 @@ class QuotaCounters:
         platform_tpm_budget: int = 0,
         use_buckets: bool = True,
     ) -> None:
-        window = minute_key()
+        window = minute_window()
         short = _short_id(tenant_id)
         self.store.incr_many(
             [

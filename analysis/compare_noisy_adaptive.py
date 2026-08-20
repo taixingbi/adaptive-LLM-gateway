@@ -4,14 +4,13 @@
 from __future__ import annotations
 
 import argparse
-import json
-import re
 import sys
 from pathlib import Path
 from statistics import mean, pstdev
 
 sys.path.insert(0, str(Path(__file__).parent))
-from metrics import load_events, summarize
+from metrics import load_events, summarize  # noqa: E402
+from runs import load_summary_runs, select_latest  # noqa: E402
 
 VICTIM = "tenant-007"
 METRICS = [
@@ -30,8 +29,8 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("analysis/result_paper/noisy_neighbor_adaptive_comparison.md"))
     args = parser.parse_args()
 
-    adaptive = _latest_reps(args.adaptive_root, "noisy_neighbor", "adaptive-slo")
-    static = _latest_reps(args.static_root, "noisy_neighbor", "slo-aware")
+    adaptive = _latest_dirs(args.adaptive_root, "noisy_neighbor", "adaptive-slo")
+    static = _latest_dirs(args.static_root, "noisy_neighbor", "slo-aware")
     if not adaptive:
         raise SystemExit("no adaptive-slo noisy_neighbor runs found")
     if not static:
@@ -48,19 +47,9 @@ def main() -> None:
     print(f"wrote {args.out}")
 
 
-def _latest_reps(root: Path, scenario: str, policy: str) -> list[Path]:
-    pat = re.compile(rf"^{re.escape(scenario)}-{re.escape(policy)}-r(\d+)-")
-    latest: dict[int, Path] = {}
-    for summary in root.glob(f"{scenario}-{policy}-r*/summary.json"):
-        m = pat.match(summary.parent.name)
-        if not m:
-            continue
-        rep = int(m.group(1))
-        if 1 <= rep <= 5:
-            prev = latest.get(rep)
-            if prev is None or summary.parent.name > prev.name:
-                latest[rep] = summary.parent
-    return [latest[r] for r in sorted(latest)]
+def _latest_dirs(root: Path, scenario: str, policy: str) -> list[Path]:
+    runs = [r for r in load_summary_runs(root, scenario) if r["policy"] == policy]
+    return [r["run_dir"] for r in select_latest(runs, ("policy", "rep"), 1, 5)]
 
 
 def _non_victim_summary(run_dir: Path) -> dict:

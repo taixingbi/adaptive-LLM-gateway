@@ -33,7 +33,7 @@ Bedrock CRIS                                       ↓
 
 `terraform/envs/dev/terraform.tfvars` uses account `646821141010` (current AWS CLI identity). Point qa/prod at their own 12-digit IDs when those accounts exist. GitHub Actions secrets stay empty.
 
-This repo was created after 15 Jul 2026, so GitHub OIDC `sub` is `repo:taixingbi@ORG_ID/bedrock-platform@REPO_ID:...`. The IAM trust policy matches both that format and the older `repo:org/repo:*` form.
+This repo was created after 15 Jul 2026, so GitHub OIDC `sub` is `repo:taixingbi@ORG_ID/adaptive-LLM-gateway@REPO_ID:...`. The IAM trust policy matches both that format and the older `repo:org/repo:*` form.
 
 Terraform state is in S3 bucket `bedrock-platform-tfstate-646821141010` (keys `envs/{dev,qa,prod}/terraform.tfstate`), not in git. CI and laptops must share that backend so IAM/OIDC created locally is not recreated.
 
@@ -131,6 +131,10 @@ python3.11 -m venv .venv
 
 # Paper matrix (6 policies × 5 reps). Victim tenant-007 bursts 10x; summary excludes them.
 .venv/bin/python scripts/run_experiment.py experiments/noisy_neighbor.yaml --all-policies --deploy
+
+# Adaptive controller (same YAML; not included in --all-policies)
+.venv/bin/python scripts/run_experiment.py experiments/noisy_neighbor.yaml --policy adaptive-slo --deploy
+.venv/bin/python scripts/run_experiment.py experiments/token_burst.yaml --policy adaptive-slo --deploy
 ```
 
 Locust users are 1:1 with tenants. Each tenant has its own RPM and prompt class (`loadgen/traffic.py`): P1 5–15 RPM short/medium, P2 5–20 mixed, P3 1–10 medium/long, then skew so the busiest 10 tenants carry ~45% of traffic.
@@ -148,7 +152,7 @@ LOADGEN_ROLE_ARN=$(terraform -chdir=terraform/envs/dev output -json sample_role_
 # Plots from gateway events (source of truth)
 python3 analysis/plots.py /path/to/downloaded/jsonl
 
-# Simple policy-level view from analysis/archive/*/summary.json
+# Policy-level view from analysis/archive/*/summary.json (latest run per policy × repetition)
 python3 analysis/visualize.py --scenario noisy_neighbor --title "Noisy neighbor policy comparison"
 ```
 

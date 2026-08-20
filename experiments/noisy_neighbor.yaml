@@ -14,6 +14,7 @@ tenants: 100
 victim: tenant-007
 prompt_class: medium
 policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
+# Adaptive controller: python3 scripts/run_experiment.py experiments/noisy_neighbor.yaml --policy adaptive-slo
 phases:
   - minutes: [0, 3]
     burst: 1x

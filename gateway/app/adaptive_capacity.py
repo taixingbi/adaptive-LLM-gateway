@@ -59,12 +59,9 @@ class AdaptiveCapacity:
         self._cap_key = _k("adaptive", "capacity")
         self._action_key = _k("adaptive", "last_action")
         self._updated_key = _k("adaptive", "updated_at")
-        # Seed shared state only when missing so replica restarts do not reset C_hat.
         self._seed_shared_state()
 
     def _seed_shared_state(self) -> None:
-        if not hasattr(self._store, "get_raw") or not hasattr(self._store, "set_raw"):
-            return
         if self._store.get_raw(self._cap_key) is None:
             self._store.set_raw(self._cap_key, str(int(self.c0)), ttl_s=86400)
             self._local_last_action = "init"
@@ -175,47 +172,29 @@ class AdaptiveCapacity:
         self._store.incrby(key, amount, ttl_s)
 
     def _read_capacity(self) -> float:
-        if hasattr(self._store, "get_raw"):
-            raw = self._store.get_raw(self._cap_key)
-            if raw is not None:
-                return float(raw)
-        value = self._store.get_int(self._cap_key)
-        if value <= 0:
-            return float(self._local_capacity or self.c0)
-        return float(value)
+        raw = self._store.get_raw(self._cap_key)
+        if raw is not None:
+            return float(raw)
+        return float(self._local_capacity or self.c0)
 
     def _write_capacity(self, value: float) -> None:
         self._local_capacity = float(value)
-        if hasattr(self._store, "set_raw"):
-            self._store.set_raw(self._cap_key, str(int(value)), ttl_s=86400)
-        else:
-            current = self._store.get_int(self._cap_key)
-            delta = int(value) - current
-            if delta != 0:
-                self._store.incrby(self._cap_key, delta, 86400)
-            elif current == 0:
-                self._store.incrby(self._cap_key, int(value), 86400)
+        self._store.set_raw(self._cap_key, str(int(value)), ttl_s=86400)
 
     def _read_action(self) -> str:
-        if hasattr(self._store, "get_raw"):
-            raw = self._store.get_raw(self._action_key)
-            if raw:
-                return str(raw)
-        return self._local_last_action
+        raw = self._store.get_raw(self._action_key)
+        return str(raw) if raw else self._local_last_action
 
     def _write_action(self, action: str) -> None:
         self._local_last_action = action
-        if hasattr(self._store, "set_raw"):
-            self._store.set_raw(self._action_key, action, ttl_s=86400)
+        self._store.set_raw(self._action_key, action, ttl_s=86400)
 
     def _read_updated_at(self) -> float:
-        if hasattr(self._store, "get_raw"):
-            raw = self._store.get_raw(self._updated_key)
-            if raw is not None:
-                return float(raw)
+        raw = self._store.get_raw(self._updated_key)
+        if raw is not None:
+            return float(raw)
         return self._local_last_update
 
     def _set_updated_at(self, ts: float) -> None:
         self._local_last_update = ts
-        if hasattr(self._store, "set_raw"):
-            self._store.set_raw(self._updated_key, str(ts), ttl_s=86400)
+        self._store.set_raw(self._updated_key, str(ts), ttl_s=86400)

@@ -11,7 +11,10 @@ and the rest carry ~25%. Repeatable via tenant_id seed.
 from __future__ import annotations
 
 import random
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 TIER_RPM = {"P1": (5.0, 15.0), "P2": (5.0, 20.0), "P3": (1.0, 10.0)}
 TIER_PROMPTS = {
@@ -21,8 +24,17 @@ TIER_PROMPTS = {
 }
 SKEW = ((0.10, 0.45), (0.30, 0.30), (0.60, 0.25))
 PLATFORM_TPM_BUDGET = 100_000
-# input + max_tokens; keep in sync with loadgen/prompts/manifest.yaml
-PROMPT_TOKENS = {"short": 348, "medium": 2198, "long": 9241}
+
+
+def _prompt_tokens() -> dict[str, int]:
+    manifest = yaml.safe_load((Path(__file__).parent / "prompts" / "manifest.yaml").read_text(encoding="utf-8"))
+    return {
+        name: int(spec["input_tokens"]) + int(spec["max_tokens"])
+        for name, spec in manifest["prompts"].items()
+    }
+
+
+PROMPT_TOKENS = _prompt_tokens()
 
 
 def assign_traffic(

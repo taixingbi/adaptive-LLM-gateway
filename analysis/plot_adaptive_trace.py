@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import argparse
-import json
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, str(Path(__file__).parent))
+from metrics import load_events  # noqa: E402
 
 
 def main() -> None:
@@ -17,11 +20,7 @@ def main() -> None:
     parser.add_argument("--bin-s", type=float, default=5.0)
     args = parser.parse_args()
 
-    events = []
-    for file in sorted(args.run_dir.rglob("*.jsonl")):
-        for line in file.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                events.append(json.loads(line))
+    events = load_events(args.run_dir)
     if not events:
         raise SystemExit(f"no events in {args.run_dir}")
 
@@ -59,6 +58,7 @@ def main() -> None:
     axes[3].legend()
     fig.tight_layout()
     fig.savefig(out, dpi=150)
+    plt.close(fig)
     print(f"wrote {out}")
 
 

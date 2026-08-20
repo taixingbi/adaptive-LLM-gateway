@@ -18,3 +18,5 @@ dist/
 .DS_Store
 .env
 analysis/out/
+analysis/result/
+analysis/.mplconfig/

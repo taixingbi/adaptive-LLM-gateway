@@ -9,6 +9,7 @@ tenants: 100
 rpm: 500
 phase_duration_s: 180
 policies: [none, rpm, tpm, token-bucket, priority, slo-aware]
+# Adaptive controller: python3 scripts/run_experiment.py experiments/token_burst.yaml --policy adaptive-slo
 phases:
   - name: normal
     prompt_class: short
