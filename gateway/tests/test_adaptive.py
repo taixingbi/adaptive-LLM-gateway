@@ -65,3 +65,28 @@ def test_aimd_decreases_on_429() -> None:
     time.sleep(0.06)
     budget = ctl.current_budget()
     assert budget <= 50000
+
+
+def test_aimd_grows_fast_under_healthy_rejects() -> None:
+    """Policy rejects with no Bedrock 429 → multiplicative increase."""
+    import time
+
+    store = MemoryCounters()
+    ctl = AdaptiveCapacity(store, c0=100000, alpha=0.2, beta=0.5, window_s=0.05, c_max=2000000)
+    for _ in range(20):
+        ctl.observe(admitted=False, slo_met=None, bedrock_429=False)
+    time.sleep(0.06)
+    assert ctl.current_budget() >= 120000
+
+
+def test_seed_does_not_clobber_existing_capacity() -> None:
+    from app.counters import _k
+
+    store = MemoryCounters()
+    AdaptiveCapacity(store, c0=100000, window_s=60.0)
+    store.set_raw(_k("adaptive", "capacity"), "250000", ttl_s=60)
+    store.set_raw(_k("adaptive", "last_action"), "increase", ttl_s=60)
+    # Long window so current_budget() does not AIMD-step before we read.
+    ctl2 = AdaptiveCapacity(store, c0=100000, window_s=60.0)
+    assert int(store.get_raw(_k("adaptive", "capacity"))) == 250000
+    assert ctl2.current_budget() == 250000

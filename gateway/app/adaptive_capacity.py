@@ -2,8 +2,8 @@
 
 Static slo-aware uses a fixed synthetic budget C. On an elastic Bedrock backend
 that budget often underestimates available capacity and causes over-shedding.
-This controller raises C_hat when recent admitted traffic is healthy (no 429,
-low SLO-fail rate) and multiplicatively decreases when unhealthy.
+This controller raises C_hat when recent traffic is healthy (no Bedrock 429) and
+shrinks it when the provider signals overload.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class AdaptiveSnapshot:
     capacity: int
     window_admits: int
+    window_rejects: int
     window_slo_fail: int
     window_bedrock_429: int
     last_action: str
@@ -41,7 +42,7 @@ class AdaptiveCapacity:
         window_s: float = 15.0,
         c_min: int | None = None,
         c_max: int | None = None,
-        slo_fail_threshold: float = 0.05,
+        slo_fail_threshold: float = 0.25,
     ) -> None:
         self._store = store
         self.c0 = max(int(c0), 1)
@@ -58,10 +59,19 @@ class AdaptiveCapacity:
         self._cap_key = _k("adaptive", "capacity")
         self._action_key = _k("adaptive", "last_action")
         self._updated_key = _k("adaptive", "updated_at")
-        # Seed shared clock so the first window is a full control interval.
-        if hasattr(self._store, "set_raw"):
-            self._store.set_raw(self._updated_key, str(self._local_last_update), ttl_s=86400)
+        # Seed shared state only when missing so replica restarts do not reset C_hat.
+        self._seed_shared_state()
+
+    def _seed_shared_state(self) -> None:
+        if not hasattr(self._store, "get_raw") or not hasattr(self._store, "set_raw"):
+            return
+        if self._store.get_raw(self._cap_key) is None:
             self._store.set_raw(self._cap_key, str(int(self.c0)), ttl_s=86400)
+            self._local_last_action = "init"
+            self._store.set_raw(self._action_key, "init", ttl_s=86400)
+        if self._store.get_raw(self._updated_key) is None:
+            self._store.set_raw(self._updated_key, str(self._local_last_update), ttl_s=86400)
+        if self._store.get_raw(self._action_key) is None:
             self._store.set_raw(self._action_key, "init", ttl_s=86400)
 
     def current_budget(self) -> int:
@@ -71,14 +81,12 @@ class AdaptiveCapacity:
     def snapshot(self) -> AdaptiveSnapshot:
         self._maybe_update()
         bucket = self._window_bucket()
-        admits = self._get(self._win_key(bucket, "admits"))
-        fails = self._get(self._win_key(bucket, "slo_fail"))
-        r429 = self._get(self._win_key(bucket, "bedrock_429"))
         return AdaptiveSnapshot(
             capacity=int(self._read_capacity()),
-            window_admits=admits,
-            window_slo_fail=fails,
-            window_bedrock_429=r429,
+            window_admits=self._get(self._win_key(bucket, "admits")),
+            window_rejects=self._get(self._win_key(bucket, "rejects")),
+            window_slo_fail=self._get(self._win_key(bucket, "slo_fail")),
+            window_bedrock_429=self._get(self._win_key(bucket, "bedrock_429")),
             last_action=self._read_action(),
             window_s=self.window_s,
         )
@@ -92,8 +100,6 @@ class AdaptiveCapacity:
         ttft_ms: float | None = None,
     ) -> None:
         del ttft_ms  # reserved for richer controllers / traces
-        if not admitted and not bedrock_429:
-            return
         bucket = self._window_bucket()
         ttl = max(int(self.window_s * 4), 120)
         if admitted:
@@ -102,6 +108,9 @@ class AdaptiveCapacity:
                 self._incr(self._win_key(bucket, "slo_fail"), 1, ttl)
             elif slo_met is True:
                 self._incr(self._win_key(bucket, "slo_ok"), 1, ttl)
+        else:
+            # Policy reject / queue timeout: demand signal for under-budgeted C_hat.
+            self._incr(self._win_key(bucket, "rejects"), 1, ttl)
         if bedrock_429:
             self._incr(self._win_key(bucket, "bedrock_429"), 1, ttl)
         self._maybe_update()
@@ -116,27 +125,38 @@ class AdaptiveCapacity:
             self._set_updated_at(now)
             prev_bucket = self._window_bucket(now - self.window_s)
             admits = self._get(self._win_key(prev_bucket, "admits"))
+            rejects = self._get(self._win_key(prev_bucket, "rejects"))
             fails = self._get(self._win_key(prev_bucket, "slo_fail"))
             r429 = self._get(self._win_key(prev_bucket, "bedrock_429"))
             capacity = self._read_capacity()
             fail_rate = (fails / admits) if admits > 0 else 0.0
-            unhealthy = r429 > 0 or (admits >= 5 and fail_rate > self.slo_fail_threshold)
-            if unhealthy:
+            offered = admits + rejects
+            reject_rate = (rejects / offered) if offered > 0 else 0.0
+
+            # Provider overload → shrink. High conditional SLO-fail (without 429)
+            # is a secondary shrink signal with a loose threshold so token-size
+            # jumps alone do not collapse C_hat.
+            if r429 > 0 or (admits >= 5 and fail_rate > self.slo_fail_threshold):
                 next_c = max(self.c_min, capacity * self.beta)
                 action = "decrease"
+            elif r429 == 0 and rejects >= 5 and reject_rate >= 0.2:
+                # Elastic backend + gateway over-shed → raise C_hat quickly.
+                next_c = min(self.c_max, capacity * (1.0 + self.alpha))
+                action = "increase-demand"
             else:
-                # Grow when healthy; grow faster if we observed demand (admits>0).
                 step = self.alpha * self.c0
                 next_c = min(self.c_max, capacity + step)
                 action = "increase" if next_c > capacity + 1 else "hold"
             self._write_capacity(next_c)
             self._write_action(action)
             logger.info(
-                "adaptive AIMD action=%s capacity=%.0f->%.0f admits=%s slo_fail=%s 429=%s",
+                "adaptive AIMD action=%s capacity=%.0f->%.0f admits=%s rejects=%s "
+                "slo_fail=%s 429=%s",
                 action,
                 capacity,
                 next_c,
                 admits,
+                rejects,
                 fails,
                 r429,
             )
@@ -169,7 +189,6 @@ class AdaptiveCapacity:
         if hasattr(self._store, "set_raw"):
             self._store.set_raw(self._cap_key, str(int(value)), ttl_s=86400)
         else:
-            # Memory store: encode as int TPM via incr reset pattern.
             current = self._store.get_int(self._cap_key)
             delta = int(value) - current
             if delta != 0:

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     adaptive_window_s: float = 15.0
     adaptive_c_min: int = 50000
     adaptive_c_max: int = 2000000
-    adaptive_slo_fail_threshold: float = 0.05
+    adaptive_slo_fail_threshold: float = 0.25
 
 
 @lru_cache
