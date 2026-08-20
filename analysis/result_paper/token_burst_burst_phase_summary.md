@@ -5,6 +5,7 @@ Selection rule: latest run per `(policy, repetition)` for `r1..r5`.
 
 | Policy | Reps | Admit | Conditional SLO | Effective SLO Goodput | P95 TTFT (ms) | P99 TTFT (ms) | Throttle |
 |---|---:|---:|---:|---:|---:|---:|---:|
+| `adaptive-slo` | 5 | 0.860 | 0.982 | 0.844 | 413.4 | 494.0 | 0.140 |
 | `none` | 5 | 1.000 | 1.000 | 1.000 | 464.7 | 566.1 | 0.000 |
 | `priority` | 5 | 0.134 | 0.855 | 0.115 | 378.5 | 413.1 | 0.866 |
 | `rpm` | 5 | 1.000 | 1.000 | 1.000 | 426.5 | 532.1 | 0.000 |
@@ -14,6 +15,7 @@ Selection rule: latest run per `(policy, repetition)` for `r1..r5`.
 
 ## Selected runs
 
+- `adaptive-slo`: r1: token_burst-adaptive-slo-r1-20260820-101852; r2: token_burst-adaptive-slo-r2-20260820-093504; r3: token_burst-adaptive-slo-r3-20260820-094616; r4: token_burst-adaptive-slo-r4-20260820-095629; r5: token_burst-adaptive-slo-r5-20260820-100642
 - `none`: r1: token_burst-none-r1-20260819-204840; r2: token_burst-none-r2-20260819-205738; r3: token_burst-none-r3-20260819-210751; r4: token_burst-none-r4-20260819-212053; r5: token_burst-none-r5-20260819-213121
 - `priority`: r1: token_burst-priority-r1-20260820-001317; r2: token_burst-priority-r2-20260820-002330; r3: token_burst-priority-r3-20260820-003228; r4: token_burst-priority-r4-20260820-004108; r5: token_burst-priority-r5-20260820-005005
 - `rpm`: r1: token_burst-rpm-r1-20260819-214133; r2: token_burst-rpm-r2-20260819-215202; r3: token_burst-rpm-r3-20260819-220315; r4: token_burst-rpm-r4-20260819-221429; r5: token_burst-rpm-r5-20260819-222441

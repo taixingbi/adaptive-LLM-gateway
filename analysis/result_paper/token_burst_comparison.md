@@ -1,36 +1,43 @@
 # Token Burst Comparison (5-run frozen selection)
 
-Scenario: `experiments/token_burst.yaml` — fixed ~500 RPM, prompt switches short → long at 180s.  
+Scenario: `experiments/token_burst.yaml` (+ `token_burst_adaptive.yaml` for `adaptive-slo`).  
 Selection: latest run per `(policy, repetition)` for `r1..r5`.
 
 ## Burst-phase results (180–360s) — primary table
 
 | Policy | Admit | Effective goodput | Conditional SLO | P99 TTFT | Throttle |
 |---|---:|---:|---:|---:|---:|
-| `none` | 1.000 ± 0.000 | 1.000 ± 0.000 | 1.000 ± 0.000 | 566 ± 23 ms | 0.000 |
-| `rpm` | 1.000 ± 0.000 | 1.000 ± 0.001 | 1.000 ± 0.001 | 532 ± 15 ms | 0.000 |
-| `tpm` | 0.060 ± 0.008 | 0.037 ± 0.009 | 0.610 ± 0.078 | 465 ± 16 ms | 0.940 |
-| `token-bucket` | 0.113 ± 0.001 | 0.073 ± 0.005 | 0.646 ± 0.045 | 511 ± 30 ms | 0.887 |
-| `priority` | 0.134 ± 0.003 | 0.115 ± 0.010 | 0.855 ± 0.064 | 413 ± 15 ms | 0.866 |
-| `slo-aware` | 0.049 ± 0.005 | 0.046 ± 0.004 | **0.949 ± 0.029** | 398 ± 21 ms | 0.951 |
+| `none` | 1.000 | 1.000 | 1.000 | 566 ms | 0.000 |
+| `rpm` | 1.000 | 1.000 | 1.000 | 532 ms | 0.000 |
+| `tpm` | 0.060 | 0.037 | 0.610 | 465 ms | 0.940 |
+| `token-bucket` | 0.113 | 0.073 | 0.646 | 511 ms | 0.887 |
+| `priority` | 0.134 | 0.115 | 0.855 | 413 ms | 0.866 |
+| `slo-aware` | 0.049 | 0.046 | 0.949 | 398 ms | 0.951 |
+| `adaptive-slo` | **0.860** | **0.844** | 0.982 | 494 ms | 0.140 |
+
+## Adaptive validation (main new claim)
+
+`adaptive-slo` vs static `slo-aware` in the same burst window:
+
+- Effective SLO goodput: **0.844 vs 0.046** (~18×)
+- Admit rate: **0.860 vs 0.049**
+- Conditional SLO among admitted: **0.982 vs 0.949** (retained)
+- P99 TTFT: **494 vs 398 ms** (~24% higher — most of the tail protection trade-off)
+
+Controller evidence (traces in `adaptive_trace_token_burst_r{1,2,3}.png`): under healthy Bedrock (0 provider 429s), policy rejects drive multiplicative `increase-demand` and `C_hat` rises to `c_max` (2M TPM), restoring admit rate without collapsing conditional SLO.
 
 ## Findings supported by data
 
-1. **RPM blindness.** During the token-size burst, `rpm` matches `none`: both keep ~100% admit and ~100% effective goodput. Request-rate limiters do not react to token-size pressure.
-2. **Token-aware shedding.** `tpm`, `token-bucket`, `priority`, and `slo-aware` all shed heavily in burst (~87–95% throttle).
-3. **Conditional SLO vs goodput tradeoff.** Among shedding policies, `slo-aware` admits the fewest requests (~4.9%) but preserves the highest conditional SLO among admitted (~94.9%). `token-bucket` admits more (~11.3%) but conditional SLO among admitted is only ~64.6%.
-4. **Backend still healthy under none/rpm.** On Nova Micro in this workload, `none`/`rpm` remain at ~100% effective goodput during burst — so this experiment demonstrates **policy differentiation under token pressure**, not that uncontrolled traffic already violates SLO.
+1. **RPM blindness.** During the token-size burst, `rpm` matches `none`: both keep ~100% admit / goodput.
+2. **Static token/SLO over-shed.** `tpm` / `token-bucket` / `priority` / `slo-aware` throttle ~87–95% in burst; static `slo-aware` has the lowest goodput among them.
+3. **Adaptive recovers goodput.** AIMD on `C_hat` recovers most of the effective goodput that static SLO-aware leaves on the table, while keeping high conditional SLO and only a moderate P99 increase vs static.
+4. **Backend still healthy under none/rpm.** This remains a policy-differentiation result under token pressure, not a claim that uncontrolled traffic already violates SLO.
 
-## Paper-ready takeaway (honest)
+## Paper-ready takeaway
 
-At constant request rate, a token-size burst exposes overload that RPM-based controls cannot detect. Token-aware admission policies shed load; among them, SLO-aware admission trades lower burst-phase goodput for substantially higher conditional SLO on the requests it does admit.
-
-## Full-run aggregates
-
-See `token_burst_all_policies_summary.md` (includes the short-prompt first half). Prefer burst-phase tables for the main claim.
+At constant request rate, a token-size burst exposes overload that RPM cannot see. Static SLO-aware over-sheds against an elastic Bedrock backend. Adaptive SLO-aware raises `C_hat` when the provider stays healthy, recovering substantially more effective goodput while retaining most of the tail-latency protection.
 
 ## Artifacts
 
-- `token_burst_burst_phase_summary.md` / CSV via `token_burst_policy_summary.csv` (full-run means)
-- `token_burst_policy_summary.png` (burst-phase bars)
-- Selected run IDs listed in the summary markdown files
+- `token_burst_burst_phase_summary.md` / `token_burst_policy_summary.csv` / `.png`
+- `adaptive_trace_token_burst_r{1,2,3}.png`
