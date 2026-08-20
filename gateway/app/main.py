@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from app.admission.base import Decision, RequestContext, get_policy
+from app.adaptive_capacity import AdaptiveCapacity
 from app.auth import assert_model_allowed, caller_arn_from_headers
 from app.bedrock import converse_stream
 from app.config import get_settings
@@ -30,7 +31,20 @@ settings = get_settings()
 model_map = load_model_map(settings.model_map_json)
 policy = get_policy(settings.admission_policy)
 USE_BUCKETS = policy.name == "token-bucket"
+USE_ADAPTIVE = policy.name == "adaptive-slo"
 counters: QuotaCounters = build_counters(settings.redis_url)
+adaptive: AdaptiveCapacity | None = None
+if USE_ADAPTIVE:
+    adaptive = AdaptiveCapacity(
+        counters.store,
+        c0=settings.platform_tpm_budget,
+        alpha=settings.adaptive_alpha,
+        beta=settings.adaptive_beta,
+        window_s=settings.adaptive_window_s,
+        c_min=settings.adaptive_c_min,
+        c_max=settings.adaptive_c_max,
+        slo_fail_threshold=settings.adaptive_slo_fail_threshold,
+    )
 
 session = boto3.Session(region_name=settings.aws_region)
 dynamodb = session.resource("dynamodb")
@@ -51,11 +65,16 @@ PROMPT_CLASSES = {
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {
+    payload = {
         "status": "ok",
         "policy": policy.name,
         "platform_tpm_budget": str(settings.platform_tpm_budget),
     }
+    if adaptive is not None:
+        snap = adaptive.snapshot()
+        payload["adaptive_capacity"] = str(snap.capacity)
+        payload["adaptive_last_action"] = snap.last_action
+    return payload
 
 
 @app.post("/v1/converse")
@@ -144,7 +163,7 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
     ]
 
     arrival_ts = time.time()
-    decision, queue_ms = await _admit(tenant, estimated_tokens, arrival_ts)
+    decision, queue_ms, platform_budget = await _admit(tenant, estimated_tokens, arrival_ts)
     run_id = payload.get("run_id") or settings.run_id
     event = {
         "run_id": run_id,
@@ -165,12 +184,19 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
         "slo_met": False,
         "bedrock_429": False,
         "bedrock_5xx": False,
+        "platform_tpm_budget": platform_budget,
     }
+    if adaptive is not None:
+        snap = adaptive.snapshot()
+        event["adaptive_capacity"] = snap.capacity
+        event["adaptive_last_action"] = snap.last_action
 
     if decision.action != "ADMIT":
         counters.record_reject(tenant_id)
         event["finish_ts"] = time.time()
         event["e2e_ms"] = (event["finish_ts"] - arrival_ts) * 1000
+        if adaptive is not None:
+            adaptive.observe(admitted=False, slo_met=None, bedrock_429=False)
         results.write(event)
         status_code = 429 if decision.action == "REJECT" else 503
         return JSONResponse(status_code=status_code, content=event)
@@ -181,7 +207,7 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
         tenant_id,
         estimated_tokens,
         tenant_tpm_limit=tenant["tpm_limit"],
-        platform_tpm_budget=settings.platform_tpm_budget,
+        platform_tpm_budget=platform_budget,
         use_buckets=USE_BUCKETS,
     )
     try:
@@ -212,6 +238,16 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
     event["slo_met"] = stream.ttft_ms is not None and ttft_for_slo <= tenant["ttft_slo_ms"]
     if not event["slo_met"]:
         counters.record_slo_violation(tenant_id)
+    if adaptive is not None:
+        adaptive.observe(
+            admitted=True,
+            slo_met=bool(event["slo_met"]),
+            bedrock_429=bool(stream.bedrock_429),
+            ttft_ms=stream.ttft_ms,
+        )
+        snap = adaptive.snapshot()
+        event["adaptive_capacity"] = snap.capacity
+        event["adaptive_last_action"] = snap.last_action
     results.write(event)
 
     status_code = 200
@@ -225,16 +261,19 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=_jsonable(body))
 
 
-async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: float) -> tuple[Decision, float]:
+async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: float) -> tuple[Decision, float, int]:
     max_wait_ms = float(tenant["ttft_slo_ms"])
     queued = False
+    platform_budget = settings.platform_tpm_budget
     try:
         while True:
             wait_ms = (time.time() - arrival_ts) * 1000
+            if adaptive is not None:
+                platform_budget = adaptive.current_budget()
             snap = counters.snapshot(
                 tenant["tenant_id"],
                 tenant_tpm_limit=tenant["tpm_limit"],
-                platform_tpm_budget=settings.platform_tpm_budget,
+                platform_tpm_budget=platform_budget,
                 use_buckets=USE_BUCKETS,
             )
             ctx = RequestContext(
@@ -252,18 +291,18 @@ async def _admit(tenant: dict[str, Any], estimated_tokens: int, arrival_ts: floa
                 tenant_concurrency=int(snap["tenant_concurrency"]),
                 tenant_max_concurrency=tenant["max_concurrency"],
                 platform_tpm_used=int(snap["platform_tpm"]),
-                platform_tpm_budget=settings.platform_tpm_budget,
+                platform_tpm_budget=platform_budget,
                 tenant_bucket_tokens=float(snap["tenant_bucket"]),
                 platform_bucket_tokens=float(snap["platform_bucket"]),
                 weight_sum=settings.tenant_weight_sum,
             )
             decision = policy.decide(ctx)
             if decision.action == "ADMIT":
-                return decision, wait_ms
+                return decision, wait_ms, platform_budget
             if decision.action == "REJECT" or wait_ms >= max_wait_ms:
                 if wait_ms >= max_wait_ms and decision.action == "QUEUE":
-                    return Decision("REJECT", "queue-timeout"), wait_ms
-                return decision, wait_ms
+                    return Decision("REJECT", "queue-timeout"), wait_ms, platform_budget
+                return decision, wait_ms, platform_budget
             if not queued:
                 counters.adjust_queue(1)
                 queued = True

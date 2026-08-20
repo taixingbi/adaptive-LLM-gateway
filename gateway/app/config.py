@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     results_bucket: str = ""
     run_id: str = "local"
 
+    # AIMD knobs for adaptive-slo (env: ADAPTIVE_ALPHA, ADAPTIVE_BETA, ...)
+    adaptive_alpha: float = 0.15
+    adaptive_beta: float = 0.7
+    adaptive_window_s: float = 15.0
+    adaptive_c_min: int = 50000
+    adaptive_c_max: int = 2000000
+    adaptive_slo_fail_threshold: float = 0.05
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -60,7 +60,7 @@ _POLICIES: dict[str, AdmissionPolicy] | None = None
 def get_policy(name: str) -> AdmissionPolicy:
     global _POLICIES
     if _POLICIES is None:
-        from app.admission import none, priority, rpm, slo_aware, token_bucket, tpm
+        from app.admission import adaptive_slo, none, priority, rpm, slo_aware, token_bucket, tpm
 
         _POLICIES = {
             "none": none.NonePolicy(),
@@ -72,6 +72,8 @@ def get_policy(name: str) -> AdmissionPolicy:
             "priority": priority.PriorityPolicy(),
             "slo-aware": slo_aware.SloAwarePolicy(),
             "slo_aware": slo_aware.SloAwarePolicy(),
+            "adaptive-slo": adaptive_slo.AdaptiveSloAwarePolicy(),
+            "adaptive_slo": adaptive_slo.AdaptiveSloAwarePolicy(),
         }
     try:
         return _POLICIES[name]

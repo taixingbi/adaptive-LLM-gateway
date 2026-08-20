@@ -33,6 +33,7 @@ class MemoryCounters:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._values: dict[str, tuple[int, float]] = {}
+        self._raw: dict[str, tuple[str, float]] = {}
 
     def _read(self, key: str, now: float) -> int:
         value = self._values.get(key)
@@ -68,6 +69,20 @@ class MemoryCounters:
             for key, amount, ttl_s in ops:
                 current = self._read(key, now)
                 self._values[key] = (current + amount, now + ttl_s)
+
+    def get_raw(self, key: str) -> str | None:
+        now = time.time()
+        with self._lock:
+            value = self._raw.get(key)
+            if value is None or value[1] <= now:
+                self._raw.pop(key, None)
+                return None
+            return value[0]
+
+    def set_raw(self, key: str, value: str, ttl_s: int = 120) -> None:
+        now = time.time()
+        with self._lock:
+            self._raw[key] = (value, now + ttl_s)
 
 
 class RedisCounters:
@@ -115,6 +130,13 @@ class RedisCounters:
         for key, cap, now, cost in ops:
             pipe.eval(_BUCKET_LUA, 1, key, cap, now, cost)
         return [float(value) for value in pipe.execute()]
+
+    def get_raw(self, key: str) -> str | None:
+        value = self._client.get(key)
+        return None if value is None else str(value)
+
+    def set_raw(self, key: str, value: str, ttl_s: int = 120) -> None:
+        self._client.set(key, value, ex=ttl_s)
 
 
 _BUCKET_LUA = """
