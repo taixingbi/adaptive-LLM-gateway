@@ -44,6 +44,9 @@ def main() -> None:
     parser.add_argument("--deploy", action="store_true", help="terraform apply admission_policy + run_id")
     parser.add_argument("--load-pct", type=float)
     parser.add_argument("--repetitions", type=int)
+    parser.add_argument("--adaptive-alpha", type=float, default=None)
+    parser.add_argument("--adaptive-beta", type=float, default=None)
+    parser.add_argument("--adaptive-window-s", type=float, default=None)
     args = parser.parse_args()
 
     scenario = load_scenario(args.yaml_path, smoke=args.smoke, load_pct=args.load_pct)
@@ -59,26 +62,49 @@ def main() -> None:
         text=True,
     ))["app-002"]
     bucket = _tf_output("results_bucket")
+    adaptive_vars = {
+        "adaptive_alpha": args.adaptive_alpha,
+        "adaptive_beta": args.adaptive_beta,
+        "adaptive_window_s": args.adaptive_window_s,
+    }
 
     for policy in policies:
         for load_pct in load_pcts:
             if load_pct is not None:
                 scenario = load_scenario(args.yaml_path, smoke=args.smoke, load_pct=load_pct)
             for rep in range(1, reps + 1):
-                run_id = _run_id(scenario, policy, rep, load_pct)
+                run_id = _run_id(scenario, policy, rep, load_pct, adaptive_vars)
                 scenario["run_id"] = run_id
                 print(f"==> {run_id} tenants={len(scenario['profiles'])} duration={scenario['duration_s']}s")
                 if args.deploy and not args.skip_deploy:
-                    _deploy(policy, run_id)
+                    _deploy(policy, run_id, adaptive_vars)
                 _locust(scenario, gateway, role)
                 _fetch_results(bucket, run_id)
                 _summarize(scenario, run_id)
 
 
-def _run_id(scenario: dict, policy: str, rep: int, load_pct: float | None) -> str:
+def _run_id(
+    scenario: dict,
+    policy: str,
+    rep: int,
+    load_pct: float | None,
+    adaptive_vars: dict[str, float | None] | None = None,
+) -> str:
     stamp = time.strftime("%Y%m%d-%H%M%S")
     pct = f"-{int(load_pct)}pct" if load_pct is not None else ""
-    return f"{scenario['name']}-{policy}{pct}-r{rep}-{stamp}"
+    tag = ""
+    if adaptive_vars:
+        a, b, w = adaptive_vars.get("adaptive_alpha"), adaptive_vars.get("adaptive_beta"), adaptive_vars.get("adaptive_window_s")
+        parts = []
+        if a is not None:
+            parts.append(f"a{a:g}")
+        if b is not None:
+            parts.append(f"b{b:g}")
+        if w is not None:
+            parts.append(f"w{int(w) if float(w).is_integer() else w}")
+        if parts:
+            tag = "-" + "-".join(parts)
+    return f"{scenario['name']}-{policy}{pct}{tag}-r{rep}-{stamp}"
 
 
 def _tf_output(name: str) -> str:
@@ -88,19 +114,25 @@ def _tf_output(name: str) -> str:
     ).strip()
 
 
-def _deploy(policy: str, run_id: str) -> None:
+def _deploy(policy: str, run_id: str, adaptive_vars: dict[str, float | None] | None = None) -> None:
     tf = ROOT / "terraform/envs/dev"
-    subprocess.check_call(
-        [
-            "terraform",
-            f"-chdir={tf}",
-            "apply",
-            "-input=false",
-            "-auto-approve",
-            f"-var=admission_policy={policy}",
-            f"-var=run_id={run_id}",
-        ]
-    )
+    cmd = [
+        "terraform",
+        f"-chdir={tf}",
+        "apply",
+        "-input=false",
+        "-auto-approve",
+        f"-var=admission_policy={policy}",
+        f"-var=run_id={run_id}",
+    ]
+    adaptive_vars = adaptive_vars or {}
+    if adaptive_vars.get("adaptive_alpha") is not None:
+        cmd.append(f"-var=adaptive_alpha={adaptive_vars['adaptive_alpha']}")
+    if adaptive_vars.get("adaptive_beta") is not None:
+        cmd.append(f"-var=adaptive_beta={adaptive_vars['adaptive_beta']}")
+    if adaptive_vars.get("adaptive_window_s") is not None:
+        cmd.append(f"-var=adaptive_window_s={adaptive_vars['adaptive_window_s']}")
+    subprocess.check_call(cmd)
     subprocess.check_call(
         [
             "aws",

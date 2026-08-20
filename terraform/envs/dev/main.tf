@@ -53,6 +53,18 @@ variable "run_id" {
   type    = string
   default = "dev"
 }
+variable "adaptive_alpha" {
+  type    = number
+  default = 0.15
+}
+variable "adaptive_beta" {
+  type    = number
+  default = 0.7
+}
+variable "adaptive_window_s" {
+  type    = number
+  default = 15
+}
 variable "apps" {
   type = list(object({
     app_id         = string
@@ -75,6 +87,9 @@ module "platform" {
   admission_policy    = var.admission_policy
   platform_tpm_budget = var.platform_tpm_budget
   run_id              = var.run_id
+  adaptive_alpha      = var.adaptive_alpha
+  adaptive_beta       = var.adaptive_beta
+  adaptive_window_s   = var.adaptive_window_s
   cpu                 = 512
   memory              = 1024
 }

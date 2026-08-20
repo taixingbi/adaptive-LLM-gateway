@@ -71,6 +71,21 @@ variable "run_id" {
   default = "dev"
 }
 
+variable "adaptive_alpha" {
+  type    = number
+  default = 0.15
+}
+
+variable "adaptive_beta" {
+  type    = number
+  default = 0.7
+}
+
+variable "adaptive_window_s" {
+  type    = number
+  default = 15
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
@@ -123,6 +138,9 @@ module "llm_gateway" {
   platform_tpm_budget    = var.platform_tpm_budget
   experiment_model_id    = var.experiment_model_id
   run_id                 = var.run_id
+  adaptive_alpha         = var.adaptive_alpha
+  adaptive_beta          = var.adaptive_beta
+  adaptive_window_s      = var.adaptive_window_s
   tags                   = local.tags
 }
 

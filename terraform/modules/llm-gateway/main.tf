@@ -63,6 +63,21 @@ variable "run_id" {
   default = "dev"
 }
 
+variable "adaptive_alpha" {
+  type    = number
+  default = 0.15
+}
+
+variable "adaptive_beta" {
+  type    = number
+  default = 0.7
+}
+
+variable "adaptive_window_s" {
+  type    = number
+  default = 15
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
@@ -344,7 +359,10 @@ resource "aws_ecs_task_definition" "this" {
       { name = "EXPERIMENT_MODEL_ID", value = var.experiment_model_id },
       { name = "REDIS_URL", value = "rediss://${aws_elasticache_serverless_cache.quota.endpoint[0].address}:${aws_elasticache_serverless_cache.quota.endpoint[0].port}" },
       { name = "RESULTS_BUCKET", value = aws_s3_bucket.results.bucket },
-      { name = "RUN_ID", value = var.run_id }
+      { name = "RUN_ID", value = var.run_id },
+      { name = "ADAPTIVE_ALPHA", value = tostring(var.adaptive_alpha) },
+      { name = "ADAPTIVE_BETA", value = tostring(var.adaptive_beta) },
+      { name = "ADAPTIVE_WINDOW_S", value = tostring(var.adaptive_window_s) }
     ]
     logConfiguration = {
       logDriver = "awslogs"

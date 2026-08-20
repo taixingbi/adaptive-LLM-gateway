@@ -55,16 +55,28 @@ jobs:
           TD=$(aws ecs describe-services --cluster bedrock-platform-dev-llm --services llm-gateway --region "$REGION" --query 'services[0].taskDefinition' --output text 2>/dev/null || true)
           POLICY=$(grep -E '^admission_policy' terraform.tfvars | awk -F'"' '{print $2}')
           RUN_ID=$(grep -E '^run_id' terraform.tfvars | awk -F'"' '{print $2}')
+          ALPHA=0.15
+          BETA=0.7
+          WINDOW=15
           if [ -n "$TD" ] && [ "$TD" != "None" ]; then
             LIVE_POLICY=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`ADMISSION_POLICY`].value' --output text)
             LIVE_RUN=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`RUN_ID`].value' --output text)
+            LIVE_ALPHA=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`ADAPTIVE_ALPHA`].value' --output text)
+            LIVE_BETA=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`ADAPTIVE_BETA`].value' --output text)
+            LIVE_WINDOW=$(aws ecs describe-task-definition --task-definition "$TD" --region "$REGION" --query 'taskDefinition.containerDefinitions[0].environment[?name==`ADAPTIVE_WINDOW_S`].value' --output text)
             [ -n "$LIVE_POLICY" ] && [ "$LIVE_POLICY" != "None" ] && POLICY="$LIVE_POLICY"
             [ -n "$LIVE_RUN" ] && [ "$LIVE_RUN" != "None" ] && RUN_ID="$LIVE_RUN"
+            [ -n "$LIVE_ALPHA" ] && [ "$LIVE_ALPHA" != "None" ] && ALPHA="$LIVE_ALPHA"
+            [ -n "$LIVE_BETA" ] && [ "$LIVE_BETA" != "None" ] && BETA="$LIVE_BETA"
+            [ -n "$LIVE_WINDOW" ] && [ "$LIVE_WINDOW" != "None" ] && WINDOW="$LIVE_WINDOW"
           fi
-          echo "Preserving admission_policy=$POLICY run_id=$RUN_ID"
+          echo "Preserving admission_policy=$POLICY run_id=$RUN_ID alpha=$ALPHA beta=$BETA window=$WINDOW"
           terraform apply -input=false -auto-approve \
             -var="admission_policy=${POLICY}" \
-            -var="run_id=${RUN_ID}"
+            -var="run_id=${RUN_ID}" \
+            -var="adaptive_alpha=${ALPHA}" \
+            -var="adaptive_beta=${BETA}" \
+            -var="adaptive_window_s=${WINDOW}"
 
       - name: Login to ECR
         uses: aws-actions/amazon-ecr-login@v2
