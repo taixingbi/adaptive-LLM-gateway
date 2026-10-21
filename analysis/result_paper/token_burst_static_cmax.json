@@ -1,0 +1,52 @@
+{
+  "NONE": {
+    "admit": 1.0,
+    "goodput": 1.0,
+    "cond_slo": 1.0,
+    "p99_ms": 566,
+    "throttle": 0.0,
+    "source": "frozen token_burst none"
+  },
+  "STATIC-SLO @ C0=100k": {
+    "admit": 0.049,
+    "goodput": 0.046,
+    "cond_slo": 0.949,
+    "p99_ms": 398,
+    "throttle": 0.951,
+    "source": "frozen token_burst slo-aware"
+  },
+  "STATIC-SLO @ Cmax=2M": {
+    "admit": 0.8509046540380135,
+    "goodput": 0.8319658189323234,
+    "cond_slo": 0.977817602245786,
+    "p99_ms": 853.6733150482178,
+    "throttle": 0.1490953459619866,
+    "reps": 5,
+    "runs": [
+      "token_burst-slo-aware-c2M-r1-20261021-121307",
+      "token_burst-slo-aware-c2M-r2-20261021-122737",
+      "token_burst-slo-aware-c2M-r3-20261021-123339",
+      "token_burst-slo-aware-c2M-r4-20261021-123942",
+      "token_burst-slo-aware-c2M-r5-20261021-124544"
+    ],
+    "source": "new token_burst slo-aware c2M",
+    "missing": false
+  },
+  "ADAPTIVE-SLO (cold-start)": {
+    "admit": 0.11921855739661151,
+    "goodput": 0.10199662558341968,
+    "cond_slo": 0.8762976252936969,
+    "p99_ms": 565.9524440765381,
+    "throttle": 0.8807814426033884,
+    "reps": 5,
+    "runs": [
+      "token_burst-adaptive-slo-c100k-r1-20261021-125149",
+      "token_burst-adaptive-slo-c100k-r2-20261021-130435",
+      "token_burst-adaptive-slo-c100k-r3-20261021-131039",
+      "token_burst-adaptive-slo-c100k-r4-20261021-131641",
+      "token_burst-adaptive-slo-c100k-r5-20261021-170757"
+    ],
+    "source": "new token_burst adaptive-slo c100k",
+    "missing": false
+  }
+}

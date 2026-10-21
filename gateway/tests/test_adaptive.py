@@ -54,6 +54,17 @@ def test_aimd_grows_fast_under_healthy_rejects() -> None:
     assert ctl.current_budget() >= 120000
 
 
+def test_reset_returns_to_c0() -> None:
+    store = MemoryCounters()
+    ctl = AdaptiveCapacity(store, c0=100000, window_s=60.0)
+    store.set_raw(_k("adaptive", "capacity"), "2000000", ttl_s=60)
+    store.set_raw(_k("adaptive", "last_action"), "increase-demand", ttl_s=60)
+    assert ctl.reset() == 100000
+    assert int(store.get_raw(_k("adaptive", "capacity"))) == 100000
+    assert ctl.current_budget() == 100000
+    assert store.get_raw(_k("adaptive", "last_action")) == "reset"
+
+
 def test_seed_does_not_clobber_existing_capacity() -> None:
     store = MemoryCounters()
     AdaptiveCapacity(store, c0=100000, window_s=60.0)

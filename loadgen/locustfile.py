@@ -102,8 +102,17 @@ class TenantUser(HttpUser):
         token_phases = _SCENARIO.get("token_phases") or []
         if not token_phases:
             return None
+        elapsed = _elapsed_s()
+        timed = [p for p in token_phases if p.get("end_s") is not None or p.get("start_s") is not None]
+        if timed:
+            for phase in token_phases:
+                start = float(phase.get("start_s") or 0)
+                end = float(phase.get("end_s") if phase.get("end_s") is not None else 1e12)
+                if start <= elapsed < end:
+                    return phase
+            return token_phases[-1]
         width = float(_SCENARIO.get("phase_duration_s") or 180)
-        idx = min(int(_elapsed_s() // width), len(token_phases) - 1)
+        idx = min(int(elapsed // width), len(token_phases) - 1)
         return token_phases[idx]
 
     def _prompt_class(self) -> str:

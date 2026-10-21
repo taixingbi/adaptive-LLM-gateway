@@ -20,7 +20,9 @@ POLICY_METRICS = [
 
 
 def load_summary_runs(root: Path, scenario: str) -> list[dict]:
-    pattern = re.compile(rf"{re.escape(scenario)}-([a-z\-]+?)(?:-(\d+)pct)?-r(\d+)-")
+    pattern = re.compile(
+        rf"{re.escape(scenario)}-([a-z\-]+?)(?:-(\d+)pct)?(?:-c([0-9.]+[kKmM]?))?-r(\d+)-"
+    )
     rows: list[dict] = []
     for file in root.glob(f"{scenario}-*/summary.json"):
         match = pattern.match(file.parent.name)
@@ -30,7 +32,8 @@ def load_summary_runs(root: Path, scenario: str) -> list[dict]:
             {
                 "policy": match.group(1),
                 "load_pct": int(match.group(2)) if match.group(2) is not None else None,
-                "rep": int(match.group(3)),
+                "budget_tag": match.group(3),
+                "rep": int(match.group(4)),
                 "summary": json.loads(file.read_text(encoding="utf-8")),
                 "run": file.parent.name,
                 "run_dir": file.parent,
@@ -48,7 +51,15 @@ def select_latest(rows: list[dict], keys: tuple[str, ...], rep_min: int, rep_max
         prev = latest.get(key)
         if prev is None or row["run"] > prev["run"]:
             latest[key] = row
-    return sorted(latest.values(), key=lambda r: tuple(r.get(k) if r.get(k) is not None else 0 for k in keys))
+    return sorted(latest.values(), key=lambda r: tuple(_sort_part(r.get(k)) for k in keys))
+
+
+def _sort_part(value):
+    if value is None:
+        return (0, 0, "")
+    if isinstance(value, (int, float)):
+        return (1, float(value), "")
+    return (2, 0, str(value))
 
 
 def metric_value(summary: dict, name: str) -> float | None:

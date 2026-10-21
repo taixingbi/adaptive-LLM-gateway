@@ -432,6 +432,13 @@ resource "aws_apigatewayv2_integration" "this" {
   }
 }
 
+resource "aws_apigatewayv2_route" "health" {
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "GET /health"
+  authorization_type = "AWS_IAM"
+  target             = "integrations/${aws_apigatewayv2_integration.this.id}"
+}
+
 resource "aws_apigatewayv2_route" "converse" {
   api_id             = aws_apigatewayv2_api.this.id
   route_key          = "POST /v1/converse"
@@ -442,6 +449,13 @@ resource "aws_apigatewayv2_route" "converse" {
 resource "aws_apigatewayv2_route" "infer" {
   api_id             = aws_apigatewayv2_api.this.id
   route_key          = "POST /v1/infer"
+  authorization_type = "AWS_IAM"
+  target             = "integrations/${aws_apigatewayv2_integration.this.id}"
+}
+
+resource "aws_apigatewayv2_route" "reset_adaptive" {
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = "POST /v1/admin/reset-adaptive"
   authorization_type = "AWS_IAM"
   target             = "integrations/${aws_apigatewayv2_integration.this.id}"
 }

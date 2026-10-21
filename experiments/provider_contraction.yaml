@@ -1,0 +1,30 @@
+# Experiment 3 — Ĉ contraction and recovery under external Bedrock pressure.
+# Gateway sees constant “normal” token-burst load. A laptop Bedrock client
+# (same account / region / Nova Micro) bypasses admission during 240–480s.
+
+name: provider_contraction
+scenario: S3
+backend: us.amazon.nova-micro-v1:0
+tenants: 100
+rpm: 500
+duration_s: 720
+policies: [adaptive-slo]
+platform_tpm_budget: 100000
+phases:
+  - name: normal
+    start_s: 0
+    end_s: 720
+    prompt_class: short
+    input_tokens: 500
+    max_tokens: 64
+background:
+  start_s: 240
+  end_s: 480
+  concurrency: 8
+  model: us.amazon.nova-micro-v1:0
+  prompt_class: long
+  max_tokens: 256
+repetitions: 5
+smoke:
+  tenants: 10
+  duration_s: 180

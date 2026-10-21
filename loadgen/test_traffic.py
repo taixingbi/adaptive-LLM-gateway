@@ -48,6 +48,28 @@ def test_prompt_tokens_match_manifest() -> None:
     assert PROMPT_TOKENS["long"] == 8217 + 1024
 
 
+def test_coldstart_yaml_preserves_unequal_windows() -> None:
+    from pathlib import Path
+
+    from scenario import load_scenario
+
+    packed = load_scenario(Path(__file__).resolve().parents[1] / "experiments" / "token_burst_coldstart.yaml")
+    assert packed["duration_s"] == 480
+    assert [p["end_s"] for p in packed["token_phases"]] == [120, 300, 480]
+    assert packed["token_phases"][1]["input_tokens"] == 5000
+
+
+def test_contraction_yaml_keeps_background() -> None:
+    from pathlib import Path
+
+    from scenario import load_scenario
+
+    packed = load_scenario(Path(__file__).resolve().parents[1] / "experiments" / "provider_contraction.yaml")
+    assert packed["duration_s"] == 720
+    assert packed["background"]["start_s"] == 240
+    assert packed["background"]["end_s"] == 480
+
+
 def test_scale_to_budget_hits_platform_c() -> None:
     profiles = assign_traffic(tenants())
     scale_to_budget(profiles, prompt_class="medium")

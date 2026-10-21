@@ -1,6 +1,15 @@
 from app.counters import MemoryCounters, QuotaCounters, _k
 
 
+def test_delete_removes_raw_and_int_keys() -> None:
+    store = MemoryCounters()
+    store.incr("{q}:adaptive:w:1:admits", 3, 60)
+    store.set_raw("{q}:adaptive:capacity", "2000000", ttl_s=60)
+    store.delete("{q}:adaptive:capacity", "{q}:adaptive:w:1:admits")
+    assert store.get_raw("{q}:adaptive:capacity") is None
+    assert store.get_int("{q}:adaptive:w:1:admits") == 0
+
+
 def test_cluster_keys_share_hash_tag() -> None:
     store = MemoryCounters()
     QuotaCounters(store).record_admit("tenant-007", 10)

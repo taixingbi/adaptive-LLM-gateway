@@ -71,6 +71,26 @@ class AdaptiveCapacity:
         if self._store.get_raw(self._action_key) is None:
             self._store.set_raw(self._action_key, "init", ttl_s=86400)
 
+    def reset(self, c0: int | None = None) -> int:
+        """Force Ĉ(0) = C0 and drop recent AIMD window counters."""
+        if c0 is not None:
+            self.c0 = max(int(c0), 1)
+        now = time.time()
+        bucket = self._window_bucket(now)
+        keys = [self._cap_key, self._action_key, self._updated_key]
+        for offset in range(-8, 2):
+            for name in ("admits", "rejects", "slo_fail", "slo_ok", "bedrock_429"):
+                keys.append(self._win_key(bucket + offset, name))
+        self._store.delete(*keys)
+        self._local_capacity = float(self.c0)
+        self._local_last_update = now
+        self._local_last_action = "reset"
+        self._store.set_raw(self._cap_key, str(int(self.c0)), ttl_s=86400)
+        self._store.set_raw(self._action_key, "reset", ttl_s=86400)
+        self._store.set_raw(self._updated_key, str(now), ttl_s=86400)
+        logger.info("adaptive reset capacity=%s", int(self.c0))
+        return int(self.c0)
+
     def current_budget(self) -> int:
         self._maybe_update()
         return int(self._read_capacity())

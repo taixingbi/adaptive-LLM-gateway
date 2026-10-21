@@ -14,7 +14,8 @@ from traffic import PLATFORM_TPM_BUDGET, assign_traffic, scale_to_budget
 def load_scenario(path: Path, *, smoke: bool = False, load_pct: float | None = None) -> dict[str, Any]:
     spec = yaml.safe_load(path.read_text(encoding="utf-8"))
     tenant_n = int(spec.get("tenants", 100))
-    duration_s = _duration(spec)
+    orig_duration_s = _duration(spec)
+    duration_s = orig_duration_s
     if smoke:
         smoke_spec = spec.get("smoke") or {}
         tenant_n = int(smoke_spec.get("tenants", min(10, tenant_n)))
@@ -45,6 +46,15 @@ def load_scenario(path: Path, *, smoke: bool = False, load_pct: float | None = N
         for idx, phase in enumerate(packed["phases"]):
             phase["start_s"] = int(idx * width)
             phase["end_s"] = int((idx + 1) * width)
+    if smoke and packed["token_phases"]:
+        width = packed["duration_s"] / max(len(packed["token_phases"]), 1)
+        for idx, phase in enumerate(packed["token_phases"]):
+            phase["start_s"] = int(idx * width)
+            phase["end_s"] = int((idx + 1) * width)
+    if smoke and packed.get("background") and orig_duration_s > 0:
+        scale = packed["duration_s"] / orig_duration_s
+        packed["background"]["start_s"] = int(float(packed["background"].get("start_s") or 0) * scale)
+        packed["background"]["end_s"] = int(float(packed["background"].get("end_s") or orig_duration_s) * scale)
     return packed
 
 
@@ -54,6 +64,9 @@ def _duration(spec: dict[str, Any]) -> int:
     phases = spec.get("phases") or []
     if phases and "minutes" in (phases[0] or {}):
         return int(max(p["minutes"][1] for p in phases) * 60)
+    ends = [int(p["end_s"]) for p in phases if isinstance(p, dict) and p.get("end_s") is not None]
+    if ends:
+        return max(ends)
     if phases:
         return int(spec.get("phase_duration_s", 180)) * len(phases)
     return 300
@@ -74,7 +87,14 @@ def _pack(spec: dict[str, Any], profiles: list[dict], duration_s: int) -> dict[s
                 }
             )
         else:
-            phases.append(phase)
+            phases.append(dict(phase) if isinstance(phase, dict) else phase)
+    token_phases = [dict(p) for p in (spec.get("phases") or []) if isinstance(p, dict) and "prompt_class" in p]
+    if token_phases and all(p.get("end_s") is None for p in token_phases):
+        width = int(spec.get("phase_duration_s", 180))
+        for idx, phase in enumerate(token_phases):
+            phase["start_s"] = idx * width
+            phase["end_s"] = (idx + 1) * width
+    background = dict(spec["background"]) if spec.get("background") else None
     return {
         "name": spec["name"],
         "scenario": spec.get("scenario", spec["name"]),
@@ -83,11 +103,13 @@ def _pack(spec: dict[str, Any], profiles: list[dict], duration_s: int) -> dict[s
         "repetitions": int(spec.get("repetitions", 1)),
         "plot": spec.get("plot") or {},
         "prompt_class": spec.get("prompt_class"),
-        "token_phases": [p for p in (spec.get("phases") or []) if "prompt_class" in p],
+        "token_phases": token_phases,
         "phase_duration_s": int(spec.get("phase_duration_s", 180)),
         "profiles": profiles,
         "phases": phases,
         "duration_s": duration_s,
         "exclude_victim": bool((spec.get("plot") or {}).get("exclude_victim")),
         "load_pcts": spec.get("load_pct") or [None],
+        "background": background,
+        "platform_tpm_budget": spec.get("platform_tpm_budget"),
     }

@@ -75,6 +75,23 @@ def health() -> dict[str, str]:
     return payload
 
 
+@app.post("/v1/admin/reset-adaptive")
+def reset_adaptive() -> JSONResponse:
+    """Experiment-only: flush AIMD state so Ĉ(0) = C0 before a cold-start run."""
+    if adaptive is None:
+        raise HTTPException(status_code=400, detail="admission_policy is not adaptive-slo")
+    capacity = adaptive.reset(settings.platform_tpm_budget)
+    snap = adaptive.snapshot()
+    return JSONResponse(
+        {
+            "ok": True,
+            "adaptive_capacity": capacity,
+            "adaptive_last_action": snap.last_action,
+            "platform_tpm_budget": settings.platform_tpm_budget,
+        }
+    )
+
+
 @app.post("/v1/converse")
 def converse(payload: dict[str, Any], request: Request) -> JSONResponse:
     caller = caller_arn_from_headers(

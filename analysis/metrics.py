@@ -12,6 +12,8 @@ def load_events(path: Path) -> list[dict]:
     else:
         files = sorted(path.rglob("*.jsonl"))
     for file in files:
+        if file.name == "background.jsonl":
+            continue
         for line in file.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 events.append(json.loads(line))

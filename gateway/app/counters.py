@@ -24,6 +24,7 @@ class CounterStore(Protocol):
     def incr_many(self, ops: list[tuple[str, int, int]]) -> None: ...
     def get_raw(self, key: str) -> str | None: ...
     def set_raw(self, key: str, value: str, ttl_s: int = 120) -> None: ...
+    def delete(self, *keys: str) -> None: ...
 
 
 class MemoryCounters:
@@ -83,6 +84,12 @@ class MemoryCounters:
         with self._lock:
             self._raw[key] = (value, now + ttl_s)
 
+    def delete(self, *keys: str) -> None:
+        with self._lock:
+            for key in keys:
+                self._values.pop(key, None)
+                self._raw.pop(key, None)
+
 
 class RedisCounters:
     def __init__(self, url: str) -> None:
@@ -136,6 +143,10 @@ class RedisCounters:
 
     def set_raw(self, key: str, value: str, ttl_s: int = 120) -> None:
         self._client.set(key, value, ex=ttl_s)
+
+    def delete(self, *keys: str) -> None:
+        if keys:
+            self._client.delete(*keys)
 
 
 _BUCKET_LUA = """
