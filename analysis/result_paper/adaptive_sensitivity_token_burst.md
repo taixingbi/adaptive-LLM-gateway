@@ -1,4 +1,10 @@
-# Adaptive AIMD Sensitivity (token burst, 1 rep each)
+# Adaptive AIMD Sensitivity (token burst, 1 rep each) — deprecated for camera-ready
+
+**Do not use these numbers as paper headlines.** The baseline goodput 0.844 is a
+*warm-state* leftover (`Ĉ` already at `Cmax` from prior runs). Cold-start
+experiments that reset `Ĉ(0)=C0` are the controller-correctness evidence.
+This ablation is kept only as an archive; it will not be rerun until the
+cold-start / contraction figures are frozen.
 
 Burst window 180–360s. Baseline is the 5-rep mean for default `α=0.15, β=0.7, window=15s`.
 Static `slo-aware` reference: admit 0.049, goodput 0.046, P99 398 ms.

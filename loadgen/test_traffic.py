@@ -65,9 +65,9 @@ def test_contraction_yaml_keeps_background() -> None:
     from scenario import load_scenario
 
     packed = load_scenario(Path(__file__).resolve().parents[1] / "experiments" / "provider_contraction.yaml")
-    assert packed["duration_s"] == 720
-    assert packed["background"]["start_s"] == 240
-    assert packed["background"]["end_s"] == 480
+    assert packed["duration_s"] == 900
+    assert packed["background"]["start_s"] == 360
+    assert packed["background"]["end_s"] == 600
 
 
 def test_scale_to_budget_hits_platform_c() -> None:

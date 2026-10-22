@@ -25,6 +25,7 @@ class AdaptiveSnapshot:
     window_rejects: int
     window_slo_fail: int
     window_bedrock_429: int
+    window_bedrock_5xx: int
     last_action: str
     window_s: float
 
@@ -79,7 +80,7 @@ class AdaptiveCapacity:
         bucket = self._window_bucket(now)
         keys = [self._cap_key, self._action_key, self._updated_key]
         for offset in range(-8, 2):
-            for name in ("admits", "rejects", "slo_fail", "slo_ok", "bedrock_429"):
+            for name in ("admits", "rejects", "slo_fail", "slo_ok", "bedrock_429", "bedrock_5xx"):
                 keys.append(self._win_key(bucket + offset, name))
         self._store.delete(*keys)
         self._local_capacity = float(self.c0)
@@ -104,6 +105,7 @@ class AdaptiveCapacity:
             window_rejects=self._get(self._win_key(bucket, "rejects")),
             window_slo_fail=self._get(self._win_key(bucket, "slo_fail")),
             window_bedrock_429=self._get(self._win_key(bucket, "bedrock_429")),
+            window_bedrock_5xx=self._get(self._win_key(bucket, "bedrock_5xx")),
             last_action=self._read_action(),
             window_s=self.window_s,
         )
@@ -115,6 +117,7 @@ class AdaptiveCapacity:
         slo_met: bool | None,
         bedrock_429: bool,
         ttft_ms: float | None = None,
+        bedrock_5xx: bool = False,
     ) -> None:
         del ttft_ms  # reserved for richer controllers / traces
         bucket = self._window_bucket()
@@ -130,6 +133,8 @@ class AdaptiveCapacity:
             self._incr(self._win_key(bucket, "rejects"), 1, ttl)
         if bedrock_429:
             self._incr(self._win_key(bucket, "bedrock_429"), 1, ttl)
+        if bedrock_5xx:
+            self._incr(self._win_key(bucket, "bedrock_5xx"), 1, ttl)
         self._maybe_update()
 
     def _maybe_update(self) -> None:
@@ -138,37 +143,41 @@ class AdaptiveCapacity:
             last = self._read_updated_at()
             if now - last < self.window_s:
                 return
+            prev = self._window_stats(self._window_bucket(now - self.window_s))
+            cur = self._window_stats(self._window_bucket(now))
+            stats = cur if (cur["offered"] + cur["r429"] + cur["r5xx"]) > (
+                prev["offered"] + prev["r429"] + prev["r5xx"]
+            ) else prev
+            admits = stats["admits"]
+            rejects = stats["rejects"]
+            fails = stats["fails"]
+            r429 = stats["r429"]
+            r5xx = stats["r5xx"]
+            offered = stats["offered"]
+            if offered == 0 and r429 == 0 and r5xx == 0:
+                return
             # Claim this window update.
             self._set_updated_at(now)
-            prev_bucket = self._window_bucket(now - self.window_s)
-            admits = self._get(self._win_key(prev_bucket, "admits"))
-            rejects = self._get(self._win_key(prev_bucket, "rejects"))
-            fails = self._get(self._win_key(prev_bucket, "slo_fail"))
-            r429 = self._get(self._win_key(prev_bucket, "bedrock_429"))
             capacity = self._read_capacity()
-            fail_rate = (fails / admits) if admits > 0 else 0.0
-            offered = admits + rejects
             reject_rate = (rejects / offered) if offered > 0 else 0.0
 
-            # Provider overload → shrink. High conditional SLO-fail (without 429)
-            # is a secondary shrink signal with a loose threshold so token-size
-            # jumps alone do not collapse C_hat.
-            if r429 > 0 or (admits >= 5 and fail_rate > self.slo_fail_threshold):
+            # Global health = provider signals only. Per-request SLO-fail is a
+            # local tenant QoS outcome (token-size jumps, queueing) and must
+            # not shrink Ĉ or the controller cannot climb from C0.
+            if r429 > 0 or r5xx > 0:
                 next_c = max(self.c_min, capacity * self.beta)
                 action = "decrease"
-            elif r429 == 0 and rejects >= 5 and reject_rate >= 0.2:
-                # Elastic backend + gateway over-shed → raise C_hat quickly.
+            elif offered > 0:
                 next_c = min(self.c_max, capacity * (1.0 + self.alpha))
-                action = "increase-demand"
+                action = "increase-demand" if rejects >= 5 and reject_rate >= 0.2 else "increase"
             else:
-                step = self.alpha * self.c0
-                next_c = min(self.c_max, capacity + step)
-                action = "increase" if next_c > capacity + 1 else "hold"
+                next_c = capacity
+                action = "hold"
             self._write_capacity(next_c)
             self._write_action(action)
             logger.info(
                 "adaptive AIMD action=%s capacity=%.0f->%.0f admits=%s rejects=%s "
-                "slo_fail=%s 429=%s",
+                "slo_fail=%s 429=%s 5xx=%s",
                 action,
                 capacity,
                 next_c,
@@ -176,7 +185,20 @@ class AdaptiveCapacity:
                 rejects,
                 fails,
                 r429,
+                r5xx,
             )
+
+    def _window_stats(self, bucket: int) -> dict[str, int]:
+        admits = self._get(self._win_key(bucket, "admits"))
+        rejects = self._get(self._win_key(bucket, "rejects"))
+        return {
+            "admits": admits,
+            "rejects": rejects,
+            "fails": self._get(self._win_key(bucket, "slo_fail")),
+            "r429": self._get(self._win_key(bucket, "bedrock_429")),
+            "r5xx": self._get(self._win_key(bucket, "bedrock_5xx")),
+            "offered": admits + rejects,
+        }
 
     def _window_bucket(self, ts: float | None = None) -> int:
         t = time.time() if ts is None else ts

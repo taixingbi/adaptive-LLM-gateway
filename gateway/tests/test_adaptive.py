@@ -23,25 +23,27 @@ def test_adaptive_hard_shed_uses_injected_budget() -> None:
     assert soft.action == "ADMIT"
 
 
+def _tick(ctl: AdaptiveCapacity) -> int:
+    ctl._local_last_update = 0.0
+    ctl._store.set_raw(ctl._updated_key, "0", ttl_s=60)
+    return ctl.current_budget()
+
+
 def test_aimd_increases_when_healthy() -> None:
     store = MemoryCounters()
     ctl = AdaptiveCapacity(store, c0=100000, alpha=0.2, beta=0.5, window_s=0.05, c_max=500000)
     assert ctl.current_budget() == 100000
     for _ in range(10):
         ctl.observe(admitted=True, slo_met=True, bedrock_429=False)
-    time.sleep(0.06)
-    budget = ctl.current_budget()
-    assert budget > 100000
+    assert _tick(ctl) > 100000
 
 
 def test_aimd_decreases_on_429() -> None:
     store = MemoryCounters()
     ctl = AdaptiveCapacity(store, c0=100000, alpha=0.2, beta=0.5, window_s=0.05, c_min=10000)
-    assert ctl.current_budget() == 100000
+    store.set_raw(_k("adaptive", "capacity"), "200000", ttl_s=60)
     ctl.observe(admitted=True, slo_met=True, bedrock_429=True)
-    time.sleep(0.06)
-    budget = ctl.current_budget()
-    assert budget <= 50000
+    assert _tick(ctl) <= 100000
 
 
 def test_aimd_grows_fast_under_healthy_rejects() -> None:
@@ -50,8 +52,25 @@ def test_aimd_grows_fast_under_healthy_rejects() -> None:
     ctl = AdaptiveCapacity(store, c0=100000, alpha=0.2, beta=0.5, window_s=0.05, c_max=2000000)
     for _ in range(20):
         ctl.observe(admitted=False, slo_met=None, bedrock_429=False)
-    time.sleep(0.06)
-    assert ctl.current_budget() >= 120000
+    assert _tick(ctl) >= 120000
+
+
+def test_slo_fail_without_429_does_not_shrink() -> None:
+    """Local SLO misses are not a global health signal."""
+    store = MemoryCounters()
+    ctl = AdaptiveCapacity(store, c0=100000, alpha=0.2, beta=0.5, window_s=0.05, c_min=10000, c_max=2000000)
+    store.set_raw(_k("adaptive", "capacity"), "200000", ttl_s=60)
+    for _ in range(10):
+        ctl.observe(admitted=True, slo_met=False, bedrock_429=False)
+    assert _tick(ctl) >= 200000
+
+
+def test_aimd_decreases_on_5xx() -> None:
+    store = MemoryCounters()
+    ctl = AdaptiveCapacity(store, c0=100000, alpha=0.2, beta=0.5, window_s=0.05, c_min=10000)
+    store.set_raw(_k("adaptive", "capacity"), "200000", ttl_s=60)
+    ctl.observe(admitted=True, slo_met=True, bedrock_429=False, bedrock_5xx=True)
+    assert _tick(ctl) <= 100000
 
 
 def test_reset_returns_to_c0() -> None:

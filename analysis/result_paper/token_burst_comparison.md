@@ -1,5 +1,10 @@
 # Token Burst Comparison (5-run frozen selection)
 
+**Camera-ready note:** the `adaptive-slo` row below (goodput 0.844 / ~18× vs static C0)
+is a *warm-state* leftover (`Ĉ` already at `Cmax`). Do not use 0.844 / 18× as the
+headline until the reset-to-C0 cold-start rerun is written into
+`token_burst_static_cmax.md`.
+
 Scenario: `experiments/token_burst.yaml` (+ `token_burst_adaptive.yaml` for `adaptive-slo`).  
 Selection: latest run per `(policy, repetition)` for `r1..r5`.
 

@@ -36,6 +36,9 @@ def main() -> None:
 
 
 def bin_trace(events: list[dict], bin_s: float) -> dict[str, list]:
+    events = [e for e in events if e.get("arrival_ts") is not None]
+    if not events:
+        raise SystemExit("no gateway events with arrival_ts")
     t0 = min(e["arrival_ts"] for e in events)
     bins: dict[int, list[dict]] = {}
     for event in events:

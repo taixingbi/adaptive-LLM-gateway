@@ -255,6 +255,7 @@ async def infer(payload: dict[str, Any]) -> JSONResponse:
             admitted=True,
             slo_met=bool(event["slo_met"]),
             bedrock_429=bool(stream.bedrock_429),
+            bedrock_5xx=bool(stream.bedrock_5xx),
             ttft_ms=stream.ttft_ms,
         )
         _attach_adaptive(event)

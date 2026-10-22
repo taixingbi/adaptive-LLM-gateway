@@ -1,8 +1,9 @@
-# Experiment 1 — cold-start climb of Ĉ from C0
+# Experiment 1 — cold-start climb of Ĉ from C0 (after provider-health fix)
 
-Workload: `experiments/token_burst_coldstart.yaml`, `adaptive-slo`, Ĉ reset to 100k before every rep.  
+Workload: `experiments/token_burst_coldstart.yaml`, `adaptive-slo`, Ĉ reset to 100k before every rep.
 Phases: 0–120s short, 120–300s long burst, 300–480s short. 500 RPM, 100 tenants, 5 reps.
 
-Traces: `adaptive_trace_coldstart_r{1–5}.png` (+ `.csv`). These replace the leftover-Cmax Fig. 5.
+Every rep: **Ĉ(0)=100k → Ĉ_max=2M**. Traces: `adaptive_trace_coldstart_r{1–5}.png`.
 
-The companion 360s token-burst adaptive cell (Exp 2) also starts at C0 and is in `token_burst_static_cmax.md`. That burst-window goodput is lower than the archived leftover-Ĉ=2M adaptive number (0.844), which is the point of the cold-start rerun.
+Burst window 120–300s mean: admit 0.624, effective goodput **0.519**, cond. SLO 0.831, P99 516 ms, 0 provider 429s.
+That is ≫ static-C0 0.046 and below static-Cmax 0.832 (climb is in-window).
