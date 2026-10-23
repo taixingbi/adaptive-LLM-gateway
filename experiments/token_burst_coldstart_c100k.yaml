@@ -1,0 +1,34 @@
+# Matched-window baselines at C0=100k: NONE and STATIC-SLO on the
+# same 480s cold-start traffic shape as token_burst_coldstart.yaml.
+# Burst evaluation window is 120–300s.
+
+name: token_burst_coldstart_c100k
+scenario: S3
+backend: us.amazon.nova-micro-v1:0
+tenants: 100
+rpm: 500
+policies: [none, slo-aware]
+platform_tpm_budget: 100000
+phases:
+  - name: normal
+    start_s: 0
+    end_s: 120
+    prompt_class: short
+    input_tokens: 500
+    max_tokens: 64
+  - name: burst
+    start_s: 120
+    end_s: 300
+    prompt_class: long
+    input_tokens: 5000
+    max_tokens: 256
+  - name: recovery
+    start_s: 300
+    end_s: 480
+    prompt_class: short
+    input_tokens: 500
+    max_tokens: 64
+repetitions: 5
+smoke:
+  tenants: 10
+  duration_s: 120
